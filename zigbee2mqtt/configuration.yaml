@@ -3,6 +3,7 @@ mqtt:
   server: mqtt://mosquitto
 serial:
   port: /dev/zigbee
+  adapter: ezsp
 frontend:
   port: 8080
 advanced:

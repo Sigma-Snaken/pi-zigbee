@@ -15,7 +15,13 @@ router = APIRouter()
 @router.get("/system/info")
 async def system_info(request: Request):
     host = request.headers.get("host", "unknown")
-    return {"host": host, "url": f"http://{host}"}
+    # Resolve mDNS/hostname to IP for display
+    hostname = host.split(":")[0]
+    try:
+        ip = socket.gethostbyname(hostname)
+    except socket.gaierror:
+        ip = hostname
+    return {"host": ip, "url": f"http://{ip}:8000"}
 
 
 @router.get("/settings/notify")
