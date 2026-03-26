@@ -5,6 +5,7 @@ import { initButtons } from './buttons.js';
 import { initBindings } from './bindings.js';
 import { initLogs } from './logs.js';
 import { initMonitor } from './monitor.js';
+import { initWifi } from './wifi.js';
 
 const TAB_LABELS = {
     robots: '機器人',
@@ -12,6 +13,7 @@ const TAB_LABELS = {
     bindings: '動作設定',
     logs: '執行記錄',
     monitor: '機器人監控',
+    wifi: 'WiFi 設定',
 };
 
 function switchTab(tabId) {
@@ -87,3 +89,4 @@ initButtons(ws);
 initBindings();
 initLogs(ws);
 initMonitor();
+initWifi();

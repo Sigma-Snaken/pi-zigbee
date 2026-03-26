@@ -36,6 +36,13 @@ export const api = {
     getRttHeatmap: (id, limit = 500) => request('GET', `/robots/${id}/rtt-heatmap?limit=${limit}`),
     clearRttHeatmap: (id) => request('DELETE', `/robots/${id}/rtt-heatmap`),
 
+    // WiFi
+    getWifiStatus: () => request('GET', '/wifi/status'),
+    scanWifi: () => request('POST', '/wifi/scan'),
+    connectWifi: (data) => request('POST', '/wifi/connect', data),
+    startHotspot: (data) => request('POST', '/wifi/hotspot/start', data),
+    stopHotspot: () => request('POST', '/wifi/hotspot/stop'),
+
     // System
     getSystemInfo: () => request('GET', '/system/info'),
     getNotifySettings: () => request('GET', '/settings/notify'),

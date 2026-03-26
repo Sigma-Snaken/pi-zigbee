@@ -668,6 +668,19 @@ tr:hover td {
     }
 }
 
+/* ── WiFi ── */
+.wifi-status { padding: 0.75rem 0; }
+.wifi-status-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+.wifi-status-row .sys-label { min-width: 3rem; }
+.hotspot-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; padding: 0.5rem 0; }
+.form-inline { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0; }
+.form-inline label { min-width: auto; margin-bottom: 0; }
+.form-inline input { width: 12rem; }
+.hotspot-info { display: flex; align-items: center; gap: 0.5rem; }
+.text-danger { color: var(--coral); }
+.text-success { color: var(--success); }
+.hint { color: var(--text-muted); font-size: 0.85rem; margin: 0.5rem 0; }
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--panel-dark); }
