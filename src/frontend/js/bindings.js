@@ -87,8 +87,7 @@ async function saveBindings(buttonId) {
             if(!s||!l){showToast(`${TRIGGER_LABELS[trigger]}: 請選擇貨架和位置`,'error');valid=false;return;}
             params={shelf:s,location:l};
         } else if(action==='return_shelf'){
-            const s=pd.querySelector('.param-shelf')?.value;
-            if(!s){showToast(`${TRIGGER_LABELS[trigger]}: 請選擇貨架`,'error');valid=false;return;}
+            const s=pd.querySelector('.param-shelf')?.value||'';
             params={shelf:s};
         } else if(action==='start_shortcut'){
             const v=pd.querySelector('.param-shortcut_id')?.value;
