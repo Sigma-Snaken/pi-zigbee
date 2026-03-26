@@ -340,4 +340,4 @@ uv venv .venv && uv pip install -r requirements.txt
 
 ## License
 
-Private repository.
+Copyright 2026 Sigma Robotics. Licensed under the [Apache License 2.0](LICENSE).
