@@ -63,7 +63,16 @@ async def create_robot(body: RobotCreate):
         await db.commit()
     except Exception as e:
         raise HTTPException(400, f"Failed to create robot: {e}")
-    return {"ok": True, "id": body.id}
+    # Connect to robot immediately
+    rm = _state.get("robot_manager")
+    connected = False
+    if rm:
+        try:
+            rm.add(body.id, body.ip)
+            connected = True
+        except Exception as e:
+            logger.warning(f"Robot added to DB but connection failed: {e}")
+    return {"ok": True, "id": body.id, "connected": connected}
 
 
 @router.put("/robots/{robot_id}")
