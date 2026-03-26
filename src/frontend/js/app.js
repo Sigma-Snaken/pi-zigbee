@@ -78,7 +78,7 @@ export function showModal(title, bodyHtml, onConfirm) {
 // Load system info bar
 api.getSystemInfo().then(info => {
     document.getElementById('system-bar').innerHTML =
-        `<span class="sys-label">IP</span> <span class="sys-value">${info.url}</span>`;
+        `<span class="sys-label">URL</span> <span class="sys-value">${info.url}</span>`;
 }).catch(() => {});
 
 ws.connect();

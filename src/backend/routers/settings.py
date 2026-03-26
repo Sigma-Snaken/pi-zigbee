@@ -12,22 +12,10 @@ logger = get_logger("routers.settings")
 router = APIRouter()
 
 
-def _get_local_ip() -> str:
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "unknown"
-
-
 @router.get("/system/info")
 async def system_info(request: Request):
-    ip = _get_local_ip()
-    port = os.environ.get("APP_PORT", "8000")
-    return {"ip": ip, "port": port, "url": f"http://{ip}:{port}"}
+    host = request.headers.get("host", "unknown")
+    return {"host": host, "url": f"http://{host}"}
 
 
 @router.get("/settings/notify")
