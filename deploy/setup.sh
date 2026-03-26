@@ -15,6 +15,16 @@ echo "Configuring Docker daemon..."
 sudo cp daemon.json /etc/docker/daemon.json
 sudo systemctl restart docker
 
+# Create udev rule for Zigbee dongle (fixed /dev/zigbee symlink)
+echo "Setting up Zigbee dongle udev rule..."
+echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="zigbee"' | sudo tee /etc/udev/rules.d/99-zigbee.rules > /dev/null
+sudo udevadm control --reload-rules && sudo udevadm trigger
+if [ -e /dev/zigbee ]; then
+    echo "Zigbee dongle found at /dev/zigbee -> $(readlink /dev/zigbee)"
+else
+    echo "Warning: Zigbee dongle not detected. Plug it in and run: sudo udevadm trigger"
+fi
+
 APP_DIR=/opt/app/pi-zigbee
 sudo mkdir -p "$APP_DIR"
 sudo chown "$USER:$USER" "$APP_DIR"
@@ -38,7 +48,7 @@ mqtt:
   base_topic: zigbee2mqtt
   server: mqtt://mosquitto
 serial:
-  port: /dev/ttyACM0
+  port: /dev/zigbee
 frontend:
   port: 8080
 advanced:

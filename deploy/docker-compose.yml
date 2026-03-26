@@ -14,7 +14,7 @@ services:
     volumes:
       - ./zigbee2mqtt:/app/data
     devices:
-      - ${ZIGBEE_DEVICE:-/dev/ttyACM0}:/dev/ttyACM0
+      - /dev/zigbee:/dev/zigbee
     environment:
       - TZ=Asia/Taipei
     depends_on:
