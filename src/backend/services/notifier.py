@@ -13,6 +13,7 @@ class TelegramNotifier:
         self.bot_token: str = ""
         self.chat_id: str = ""
         self.enabled: bool = False
+        self.host_url: str = ""
 
     def configure(self, bot_token: str, chat_id: str) -> None:
         self.bot_token = bot_token.strip()

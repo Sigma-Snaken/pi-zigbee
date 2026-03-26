@@ -43,7 +43,7 @@ class NotifyConfig(BaseModel):
 
 
 @router.put("/settings/notify")
-async def update_notify_settings(body: NotifyConfig):
+async def update_notify_settings(body: NotifyConfig, request: Request):
     db = _state["db"]
     config = json.dumps({"bot_token": body.bot_token.strip(), "chat_id": body.chat_id.strip()})
     await db.execute(
@@ -57,16 +57,18 @@ async def update_notify_settings(body: NotifyConfig):
     notifier = _state.get("notifier")
     if notifier:
         notifier.configure(body.bot_token, body.chat_id)
+        notifier.host_url = f"http://{request.headers.get('host', 'unknown')}"
 
     return {"ok": True, "enabled": bool(body.bot_token.strip() and body.chat_id.strip())}
 
 
 @router.post("/settings/notify/test")
-async def test_notify():
+async def test_notify(request: Request):
     notifier = _state.get("notifier")
     if not notifier or not notifier.enabled:
         return {"ok": False, "error": "Telegram not configured"}
-    success = await notifier.send("🔔 Sigma 控制介面通知測試成功！")
+    host = request.headers.get("host", "unknown")
+    success = await notifier.send(f"🔔 Sigma 控制介面通知測試成功！\n📍 http://{host}")
     return {"ok": success}
 
 

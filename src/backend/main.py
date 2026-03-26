@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
     robot_manager = RobotManager()
     action_executor = ActionExecutor(robot_manager)
     notifier = TelegramNotifier()
-    button_manager = ButtonManager(db, action_executor, ws_manager, notifier)
+    button_manager = ButtonManager(db, action_executor, ws_manager)
 
     # Load telegram config from DB
     try:
