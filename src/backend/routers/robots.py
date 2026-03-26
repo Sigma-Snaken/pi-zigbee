@@ -53,6 +53,8 @@ async def list_robots():
 
 @router.post("/robots", status_code=201)
 async def create_robot(body: RobotCreate):
+    if not body.id or not body.id.strip():
+        raise HTTPException(400, "Robot ID is required")
     db = _state["db"]
     now = datetime.now(timezone.utc).isoformat()
     try:
