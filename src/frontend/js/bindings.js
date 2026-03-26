@@ -30,12 +30,36 @@ async function loadBindings(buttonId,robots) {
     slotsDiv.querySelectorAll('.trigger-slot').forEach(slot=>{
         const trigger=slot.dataset.trigger;const b=data.bindings[trigger];
         const actionSel=slot.querySelector('.bind-action'),robotSel=slot.querySelector('.bind-robot'),paramsDiv=slot.querySelector('.bind-params');
-        const renderParams=async()=>{const action=actionSel.value,robotId=robotSel.value;paramsDiv.innerHTML='';if(!action)return;
-            if(action==='move_to_location'&&robotId){try{const d=await api.getLocations(robotId);const locs=d.locations||[];const cur=b&&b.action===action?b.params.name:'';paramsDiv.innerHTML=`<div class="form-group"><label>位置</label><select class="param-name">${locs.map(l=>`<option value="${l.name}" ${l.name===cur?'selected':''}>${l.name}</option>`).join('')}</select></div>`;}catch{paramsDiv.innerHTML='<p style="color:var(--danger);font-size:0.8rem">無法取得位置清單</p>';}}
-            else if(action==='speak'){const cur=b&&b.action===action?b.params.text:'';paramsDiv.innerHTML=`<div class="form-group"><label>內容</label><input class="param-text" value="${cur}"></div>`;}
-            else if(action==='move_shelf'){const cs=b&&b.action===action?b.params.shelf:'',cl=b&&b.action===action?b.params.location:'';paramsDiv.innerHTML=`<div class="form-group"><label>貨架</label><input class="param-shelf" value="${cs}"></div><div class="form-group"><label>目標位置</label><input class="param-location" value="${cl}"></div>`;}
-            else if(action==='return_shelf'){const cs=b&&b.action===action?b.params.shelf:'';paramsDiv.innerHTML=`<div class="form-group"><label>貨架</label><input class="param-shelf" value="${cs}"></div>`;}
-            else if(action==='start_shortcut'&&robotId){try{const d=await api.getShortcuts(robotId);const scs=d.shortcuts||[];const cur=b&&b.action===action?b.params.shortcut_id:'';paramsDiv.innerHTML=`<div class="form-group"><label>捷徑</label><select class="param-shortcut_id">${scs.map(s=>`<option value="${s.id}" ${s.id===cur?'selected':''}>${s.name||s.id}</option>`).join('')}</select></div>`;}catch{paramsDiv.innerHTML='<p style="color:var(--danger);font-size:0.8rem">無法取得捷徑清單</p>';}}
+        const renderParams=async()=>{
+            const action=actionSel.value,robotId=robotSel.value;
+            paramsDiv.innerHTML='';
+            if(!action)return;
+            if(!robotId&&['move_to_location','move_shelf','return_shelf','start_shortcut'].includes(action)){
+                paramsDiv.innerHTML='<p style="color:var(--warning);font-size:0.8rem">請先選擇機器人</p>';return;
+            }
+            try{
+                if(action==='move_to_location'){
+                    const d=await api.getLocations(robotId);const locs=d.locations||[];
+                    const cur=b&&b.action===action?b.params.name:'';
+                    paramsDiv.innerHTML=`<div class="form-group"><label>位置</label><select class="param-name"><option value="">-- 選擇位置 --</option>${locs.map(l=>`<option value="${l.name}" ${l.name===cur?'selected':''}>${l.name}</option>`).join('')}</select></div>`;
+                }else if(action==='speak'){
+                    const cur=b&&b.action===action?b.params.text:'';
+                    paramsDiv.innerHTML=`<div class="form-group"><label>內容</label><input class="param-text" value="${cur}"></div>`;
+                }else if(action==='move_shelf'){
+                    const [sd,ld]=await Promise.all([api.getShelves(robotId),api.getLocations(robotId)]);
+                    const shelves=sd.shelves||[],locs=ld.locations||[];
+                    const cs=b&&b.action===action?b.params.shelf:'',cl=b&&b.action===action?b.params.location:'';
+                    paramsDiv.innerHTML=`<div class="form-group"><label>貨架</label><select class="param-shelf"><option value="">-- 選擇貨架 --</option>${shelves.map(s=>`<option value="${s.name}" ${s.name===cs?'selected':''}>${s.name}</option>`).join('')}</select></div><div class="form-group"><label>目標位置</label><select class="param-location"><option value="">-- 選擇位置 --</option>${locs.map(l=>`<option value="${l.name}" ${l.name===cl?'selected':''}>${l.name}</option>`).join('')}</select></div>`;
+                }else if(action==='return_shelf'){
+                    const sd=await api.getShelves(robotId);const shelves=sd.shelves||[];
+                    const cs=b&&b.action===action?b.params.shelf:'';
+                    paramsDiv.innerHTML=`<div class="form-group"><label>貨架</label><select class="param-shelf"><option value="">-- 選擇貨架 --</option>${shelves.map(s=>`<option value="${s.name}" ${s.name===cs?'selected':''}>${s.name}</option>`).join('')}</select></div>`;
+                }else if(action==='start_shortcut'){
+                    const d=await api.getShortcuts(robotId);const scs=d.shortcuts||[];
+                    const cur=b&&b.action===action?b.params.shortcut_id:'';
+                    paramsDiv.innerHTML=`<div class="form-group"><label>捷徑</label><select class="param-shortcut_id"><option value="">-- 選擇捷徑 --</option>${scs.map(s=>`<option value="${s.id}" ${s.id===cur?'selected':''}>${s.name||s.id}</option>`).join('')}</select></div>`;
+                }
+            }catch(e){paramsDiv.innerHTML=`<p style="color:var(--danger);font-size:0.8rem">無法取得資料: ${e.message}</p>`;}
         };
         actionSel.onchange=renderParams;robotSel.onchange=renderParams;renderParams();
     });
@@ -52,6 +76,7 @@ async function saveBindings(buttonId) {
         else if(action==='move_shelf')params={shelf:pd.querySelector('.param-shelf')?.value||'',location:pd.querySelector('.param-location')?.value||''};
         else if(action==='return_shelf')params={shelf:pd.querySelector('.param-shelf')?.value||''};
         else if(action==='start_shortcut')params={shortcut_id:pd.querySelector('.param-shortcut_id')?.value||''};
+        if(!Object.values(params).some(v=>v)){payload[trigger]=null;return;}
         payload[trigger]={robot_id:robotId,action,params};
     });
     try{await api.updateBindings(buttonId,payload);showToast('設定已儲存');}catch(e){showToast(e.message,'error');}

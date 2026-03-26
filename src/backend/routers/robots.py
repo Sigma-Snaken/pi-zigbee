@@ -108,6 +108,20 @@ async def get_locations(robot_id: str):
         raise HTTPException(500, str(e))
 
 
+@router.get("/robots/{robot_id}/shelves")
+async def get_shelves(robot_id: str):
+    rm = _state.get("robot_manager")
+    if not rm:
+        raise HTTPException(503, "Robot manager not available")
+    svc = rm.get(robot_id)
+    if not svc or not svc.queries:
+        raise HTTPException(404, f"Robot '{robot_id}' not connected")
+    try:
+        return svc.queries.list_shelves()
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @router.get("/robots/{robot_id}/shortcuts")
 async def get_shortcuts(robot_id: str):
     rm = _state.get("robot_manager")

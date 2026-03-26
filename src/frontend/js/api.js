@@ -17,6 +17,7 @@ export const api = {
     updateRobot: (id, data) => request('PUT', `/robots/${id}`, data),
     deleteRobot: (id) => request('DELETE', `/robots/${id}`),
     getLocations: (id) => request('GET', `/robots/${id}/locations`),
+    getShelves: (id) => request('GET', `/robots/${id}/shelves`),
     getShortcuts: (id) => request('GET', `/robots/${id}/shortcuts`),
     listButtons: () => request('GET', '/buttons'),
     updateButton: (id, data) => request('PUT', `/buttons/${id}`, data),
