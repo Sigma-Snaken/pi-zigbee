@@ -38,7 +38,8 @@ class RobotService:
         try:
             self.detector = ObjectDetector(self.conn)
             self.controller = RobotController(self.conn)
-            logger.info(f"ObjectDetector + RobotController initialized for {self.robot_id}")
+            self.controller.start()  # Start background polling (pose + battery)
+            logger.info(f"ObjectDetector + RobotController started for {self.robot_id}")
         except Exception as e:
             logger.warning(f"Could not init detector/controller for {self.robot_id}: {e}")
 

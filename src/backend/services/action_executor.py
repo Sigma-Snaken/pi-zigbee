@@ -12,28 +12,43 @@ class ActionExecutor:
         svc = self._robot_manager.get(robot_id)
         if not svc:
             return {"ok": False, "error": f"Robot '{robot_id}' not found"}
-        if not svc.commands:
+
+        # Use RobotController (preferred) for movement commands with metrics
+        # Fall back to KachakaCommands for non-movement or if controller unavailable
+        ctrl = svc.controller
+        cmds = svc.commands
+
+        if not ctrl and not cmds:
             return {"ok": False, "error": f"Robot '{robot_id}' not connected"}
 
-        cmds = svc.commands
-        action_map = {
-            "move_to_location": lambda: cmds.move_to_location(params["name"]),
-            "return_home": lambda: cmds.return_home(),
-            "speak": lambda: cmds.speak(params["text"]),
-            "move_shelf": lambda: cmds.move_shelf(params["shelf"], params["location"]),
-            "return_shelf": lambda: cmds.return_shelf(params.get("shelf")),
-            "dock_shelf": lambda: cmds.dock_shelf(),
-            "undock_shelf": lambda: cmds.undock_shelf(),
-            "start_shortcut": lambda: cmds.start_shortcut(params["shortcut_id"]),
-        }
+        # Actions that RobotController supports (with command_id verification + metrics)
+        ctrl_actions = {}
+        if ctrl:
+            ctrl_actions = {
+                "move_to_location": lambda: ctrl.move_to_location(params["name"], timeout=120),
+                "return_home": lambda: ctrl.return_home(timeout=60),
+                "move_shelf": lambda: ctrl.move_shelf(params["shelf"], params["location"], timeout=120),
+                "return_shelf": lambda: ctrl.return_shelf(params.get("shelf"), timeout=60),
+            }
 
-        handler = action_map.get(action)
+        # Actions that only KachakaCommands supports (no polling needed)
+        cmd_actions = {}
+        if cmds:
+            cmd_actions = {
+                "speak": lambda: cmds.speak(params["text"]),
+                "dock_shelf": lambda: cmds.dock_shelf(),
+                "undock_shelf": lambda: cmds.undock_shelf(),
+                "start_shortcut": lambda: cmds.start_shortcut(params["shortcut_id"]),
+            }
+
+        handler = ctrl_actions.get(action) or cmd_actions.get(action)
         if not handler:
             return {"ok": False, "error": f"Unknown action: {action}"}
 
         try:
             result = handler()
-            logger.info(f"Executed {action} on {robot_id}: ok={result.get('ok')}")
+            source = "controller" if action in ctrl_actions else "commands"
+            logger.info(f"Executed {action} on {robot_id} via {source}: ok={result.get('ok')}")
             return result
         except Exception as e:
             logger.error(f"Failed to execute {action} on {robot_id}: {e}")
