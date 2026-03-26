@@ -1,146 +1,203 @@
 # Sigma 簡易控制介面
 
-Raspberry Pi 5 上運行的 Zigbee 按鈕控制器，透過 Web UI 配對 SNZB-01 按鈕並綁定 Kachaka 機器人動作。按下按鈕即觸發對應的機器人指令。
+Raspberry Pi 5 上運行的 Zigbee 按鈕控制器。透過 Web UI 配對 SNZB-01 按鈕，綁定 Kachaka 機器人動作，按下即觸發。
 
 ## 功能
 
-- **多機器人管理** — 新增/編輯/刪除多台 Kachaka 機器人，顯示在線狀態、電量、序號
-- **Zigbee 按鈕配對** — Web UI 一鍵啟動配對模式，自動偵測 SNZB-01 設備
-- **按鈕動作綁定** — 每個按鈕的 3 種觸發方式（單擊/雙擊/長按）各自綁定一個動作
-- **8 種 Kachaka 動作** — 移動到位置、回充電座、語音播報、搬運/歸還貨架、對接/放下貨架、執行捷徑
-- **機器人監控** — 即時地圖 + 機器人位置、前後鏡頭串流
-- **執行記錄** — 完整的動作執行歷史，含錯誤代碼
-- **Telegram 通知** — 設定 Bot Token + Chat ID，手動測試通知
-- **RWD 響應式設計** — 桌面/手機最佳化，手機版浮動選單按鈕
+- **多機器人管理** — 動態新增/移除 Kachaka 機器人，RobotManager per-robot dict 架構
+- **Zigbee 按鈕配對** — Web UI 一鍵 permit_join，自動偵測 SNZB-01
+- **按鈕動作綁定** — 單擊/雙擊/長按各自綁定動作，參數從機器人即時載入
+- **8 種動作** — 移動到位置、回充電座、語音播報、搬運/歸還貨架、對接/放下貨架、執行捷徑
+- **機器人監控** — 即時地圖 + 位置、CameraStreamer 前後鏡頭串流、網路效能圖（RTT 熱力圖）
+- **執行記錄** — 動作歷史含錯誤代碼、Telegram 通知
+- **RWD** — 桌面/手機最佳化，手機版 FAB 浮動選單
 
-## 系統架構
-
-```mermaid
-graph TD
-    subgraph Docker["Docker Compose (Pi 5)"]
-        MQTT[Mosquitto :1883]
-        Z2M[Zigbee2MQTT :8080<br/>+ Sonoff Dongle]
-        subgraph App["FastAPI App :8000"]
-            MS[MQTT Service]
-            BM[Button Manager]
-            AE[Action Executor]
-            RM[Robot Manager]
-            WS[WS Manager]
-            DB[(SQLite)]
-            FE[Frontend<br/>Vanilla JS SPA]
-        end
-    end
-
-    SNZB[SNZB-01 Button] -->|Zigbee| Z2M
-    Z2M <-->|MQTT| MQTT
-    MQTT -->|subscribe| MS
-    MS -->|button action| BM
-    BM -->|query binding| DB
-    BM -->|dispatch| AE
-    AE -->|KachakaCommands| RM
-    RM -->|gRPC| Kachaka[Kachaka Robots<br/>LAN]
-    BM -->|broadcast| WS
-    WS -->|WebSocket| Browser[User Browser]
-    Browser -->|HTTP| FE
-```
-
-## 硬體需求
+## 硬體架構
 
 ```mermaid
 graph LR
-    subgraph Network["LAN (WiFi/Ethernet)"]
-        Pi[Raspberry Pi 5<br/>192.168.50.x]
-        K1[Kachaka Robot 1<br/>192.168.50.x]
-        K2[Kachaka Robot N<br/>192.168.50.x]
+    subgraph LAN["區域網路"]
+        Pi["Raspberry Pi 5<br/>Docker Compose<br/>192.168.50.x"]
+        K1["Kachaka Robot 1"]
+        K2["Kachaka Robot N"]
     end
-    Dongle[Sonoff Zigbee Dongle<br/>/dev/ttyUSB0] -->|USB| Pi
-    BTN1[SNZB-01] -.->|Zigbee| Dongle
-    BTN2[SNZB-01] -.->|Zigbee| Dongle
-    Pi -->|gRPC :26400| K1
-    Pi -->|gRPC :26400| K2
-    User[User Browser] -->|HTTP :8000| Pi
+    Dongle["Sonoff Zigbee Dongle<br/>/dev/ttyUSB0"] -->|USB| Pi
+    BTN1["SNZB-01"] -.->|Zigbee| Dongle
+    BTN2["SNZB-01"] -.->|Zigbee| Dongle
+    Pi -->|"gRPC :26400"| K1
+    Pi -->|"gRPC :26400"| K2
+    User["Browser / 手機"] -->|"HTTP :8000"| Pi
 ```
 
-| 元件 | 說明 |
-|------|------|
-| Raspberry Pi 5 | 主控制器，運行 Docker Compose |
-| Sonoff Zigbee Dongle | USB Zigbee coordinator (`/dev/ttyUSB0`) |
-| SNZB-01 | Sonoff Zigbee 按鈕（單擊/雙擊/長按） |
-| Kachaka Robot | 一台或多台，透過 LAN gRPC 連線 |
+## 軟體架構
+
+遵循 [Kachaka App Architecture](https://github.com/Sigma-Snaken) 參考架構：FastAPI lifespan + RobotManager per-robot dict + SQLite WAL + Vanilla JS SPA。
+
+```mermaid
+graph TD
+    subgraph Docker["Docker Compose (3 containers)"]
+        MQTT["Mosquitto<br/>:1883"]
+        Z2M["Zigbee2MQTT<br/>:8080<br/>+ Sonoff Dongle"]
+        subgraph App["FastAPI App :8000"]
+            direction TB
+            subgraph Services["Services Layer"]
+                RM["RobotManager<br/>(per-robot dict)"]
+                AE["ActionExecutor<br/>(async run_in_executor)"]
+                BM["ButtonManager<br/>(pairing + dispatch)"]
+                MS["MQTTService<br/>(aiomqtt)"]
+                RTT["RTTLogger<br/>(背景記錄)"]
+            end
+            subgraph Core["kachaka_core (SDK)"]
+                CONN["KachakaConnection<br/>(pooled)"]
+                CTRL["RobotController<br/>(command_id + metrics)"]
+                CMD["KachakaCommands<br/>(one-shot)"]
+                CS["CameraStreamer<br/>(背景 thread)"]
+            end
+            subgraph Data["Data Layer"]
+                DB[("SQLite WAL<br/>robots / buttons<br/>bindings / logs<br/>rtt_logs / settings")]
+            end
+            FE["Frontend<br/>Vanilla JS SPA"]
+            WS["WSManager<br/>(WebSocket)"]
+        end
+    end
+
+    SNZB["SNZB-01<br/>Button"] -.->|Zigbee| Z2M
+    Z2M <-->|MQTT| MQTT
+    MQTT -->|subscribe| MS
+    MS --> BM
+    BM -->|query| DB
+    BM -->|dispatch| AE
+    AE -->|"movement<br/>(RobotController)"| CTRL
+    AE -->|"speak/shortcut<br/>(KachakaCommands)"| CMD
+    RM --> CONN
+    CONN -->|gRPC| Kachaka["Kachaka Robots"]
+    RTT -->|"poll_count Δ"| DB
+    CS -->|"latest_frame"| FE
+    BM --> WS
+    WS -->|WebSocket| Browser["Browser"]
+    Browser -->|HTTP| FE
+```
+
+### 架構決策對照
+
+| 決策 | 本專案做法 | 架構指南建議 |
+|------|-----------|-------------|
+| Web framework | FastAPI + lifespan | FastAPI + lifespan |
+| Multi-robot | RobotManager per-robot dict | Per-robot dict (非 per-container) |
+| Robot SDK | `kachaka_core` (KachakaConnection.get) | `kachaka_core` — 禁止直接用 KachakaApiClient |
+| 移動指令 | RobotController (command_id + metrics) | RobotController for multi-step |
+| 快速指令 | KachakaCommands (speak/shortcut) | KachakaCommands for one-shot |
+| 相機 | CameraStreamer (背景 thread) | CameraStreamer — 禁止 loop 呼叫 |
+| Async 橋接 | `run_in_executor` (sync SDK → async) | `run_in_executor` 避免 block event loop |
+| Database | SQLite + WAL + versioned migrations | SQLite + migrations |
+| Frontend | Vanilla JS SPA (無 build tool) | Vanilla JS (solo) / React (team) |
+| 即時通訊 | WebSocket broadcast | WebSocket per-robot |
+| Container | Docker Compose, `--workers 1` | `--workers 1` — robot 是瓶頸 |
+| Package | `uv` (Dockerfile + venv) | `uv` 取代 pip |
+| CI/CD | GitHub Actions → GHCR (amd64+arm64) | CI 交叉編譯，禁止生產機 build |
+| IPv4 | daemon.json + dns + sysctls | 三層 IPv4 強制 |
 
 ## 快速開始
-
-### 前提條件
-
-- Raspberry Pi 5（或任何 Linux arm64/amd64 機器）
-- Sonoff Zigbee Dongle 已插入 USB
-- Docker + Docker Compose 已安裝
-- Kachaka 機器人在同一區域網路
 
 ### 首次部署
 
 ```bash
-# 1. Clone
 git clone https://github.com/Sigma-Snaken/pi-zigbee.git
-cd pi-zigbee
-
-# 2. 確認 Zigbee Dongle 路徑
-ls /dev/ttyUSB* /dev/ttyACM*
-
-# 3. 使用 deploy 腳本
-cd deploy
-chmod +x setup.sh
-./setup.sh
-
-# 4. 啟動
+cd pi-zigbee/deploy
+chmod +x setup.sh && ./setup.sh
 cd /opt/app/pi-zigbee
-docker compose pull
-docker compose up -d
+docker compose pull && docker compose up -d
 ```
 
 ### 開發環境
 
 ```bash
-# Clone + 啟動開發環境
 git clone https://github.com/Sigma-Snaken/pi-zigbee.git
 cd pi-zigbee
 docker compose up --build
-
 # override.yml 自動套用：src/ volume mount + --reload
-# 改 code 即時生效，不需重建
 ```
 
 ### 存取
 
-| 服務 | URL | 說明 |
-|------|-----|------|
-| Web UI | `http://<PI_IP>:8000` | 主控制介面 |
-| Zigbee2MQTT | `http://<PI_IP>:8080` | Zigbee 設備管理（debug 用） |
+| 服務 | URL |
+|------|-----|
+| 控制介面 | `http://<PI_IP>:8000` |
+| Zigbee2MQTT | `http://<PI_IP>:8080` |
 
-## 使用方式
+## 資料流
 
-### 1. 新增機器人
+### 按鈕 → 機器人
 
-進入「機器人」頁面 → 點「+ 新增機器人」→ 輸入名稱和 IP → 自動連線驗證
+```mermaid
+sequenceDiagram
+    participant B as SNZB-01
+    participant Z as Zigbee2MQTT
+    participant M as Mosquitto
+    participant MS as MQTTService
+    participant BM as ButtonManager
+    participant AE as ActionExecutor
+    participant RC as RobotController
+    participant K as Kachaka
 
-### 2. 配對 Zigbee 按鈕
+    B->>Z: Zigbee (button press)
+    Z->>M: MQTT {"action":"single"}
+    M->>MS: subscribe
+    MS->>BM: parsed event
+    BM->>BM: query bindings DB
+    BM->>AE: await execute()
+    Note over AE: run_in_executor (不阻塞 event loop)
+    AE->>RC: move_to_location() (blocking, in thread)
+    RC->>K: StartCommand + poll GetCommandState
+    K-->>RC: command complete
+    RC-->>AE: result
+    AE-->>BM: result
+    BM->>BM: write action_logs
+    BM-->>MS: WebSocket broadcast
+```
 
-進入「按鈕」頁面 → 點「開始配對」→ 長按 SNZB-01 五秒直到 LED 閃爍 → 自動偵測並加入
+### 鏡頭串流
 
-### 3. 綁定動作
+```mermaid
+sequenceDiagram
+    participant FE as Frontend
+    participant API as FastAPI
+    participant CS as CameraStreamer
+    participant K as Kachaka
 
-進入「綁定設定」頁面 → 選按鈕 → 為每個觸發方式（單擊/雙擊/長按）設定：
-- 選擇機器人
-- 選擇動作（位置、貨架、捷徑等從機器人自動載入）
-- 點「儲存設定」
+    FE->>API: POST /camera/front/start
+    API->>CS: start() (背景 thread, 1fps)
+    CS->>K: get_front_camera_image() (持續)
+    loop 每 2 秒
+        FE->>API: GET /camera/front
+        API->>CS: latest_frame (非阻塞)
+        CS-->>API: base64 JPEG
+        API-->>FE: image
+    end
+    FE->>API: POST /camera/front/stop
+    API->>CS: stop()
+```
 
-### 4. 監控機器人
+### 網路效能圖 (RTT)
 
-進入「機器人監控」頁面 → 選擇機器人 → 查看即時地圖 + 位置 → 開啟前/後鏡頭
+```mermaid
+sequenceDiagram
+    participant RC as RobotController
+    participant RL as RTTLogger
+    participant DB as SQLite
+    participant FE as Frontend
 
-### 5. 設定 Telegram 通知
-
-進入「執行記錄」頁面 → 輸入 Telegram Bot Token 和 Chat ID → 儲存 → 點「測試通知」驗證
+    loop 背景輪詢 (1s)
+        RC->>RC: poll pose + battery (記錄 RTT)
+    end
+    loop 每 5 秒
+        RL->>RC: check poll_count Δ
+        RL->>RC: read new poll_rtt_list entries
+        RL->>DB: INSERT rtt_logs (name, serial, x, y, θ, battery, rtt)
+    end
+    FE->>DB: GET /rtt-heatmap
+    Note over FE: 顏色疊加在地圖上<br/>綠 <50ms / 黃 50-100 / 橘 100-200 / 紅 >200
+```
 
 ## 專案結構
 
@@ -148,184 +205,89 @@ docker compose up --build
 pi-zigbee/
 ├── src/
 │   ├── backend/
-│   │   ├── main.py                  # FastAPI + lifespan
+│   │   ├── main.py                  # FastAPI + lifespan (啟動順序: DB → Robot → MQTT → RTT)
 │   │   ├── routers/
-│   │   │   ├── robots.py            # CRUD /api/robots + locations/shelves/shortcuts
-│   │   │   ├── buttons.py           # CRUD /api/buttons + pair
-│   │   │   ├── bindings.py          # GET/PUT /api/bindings/{button_id}
-│   │   │   ├── logs.py              # GET /api/logs (分頁)
-│   │   │   ├── monitor.py           # /api/robots/{id}/map, /camera/{front|back}
-│   │   │   ├── settings.py          # /api/system/info, /api/settings/notify
-│   │   │   └── ws.py                # WebSocket /ws
+│   │   │   ├── robots.py            # CRUD + locations/shelves/shortcuts
+│   │   │   ├── buttons.py           # CRUD + pair/stop
+│   │   │   ├── bindings.py          # GET/PUT per button_id
+│   │   │   ├── logs.py              # 分頁查詢
+│   │   │   ├── monitor.py           # map, camera (CameraStreamer), rtt-heatmap
+│   │   │   ├── settings.py          # system/info, notify (Telegram)
+│   │   │   └── ws.py                # WebSocket
 │   │   ├── services/
-│   │   │   ├── robot_manager.py     # 多機器人管理 (kachaka_core)
+│   │   │   ├── robot_manager.py     # RobotManager + RobotService (kachaka_core 全套)
+│   │   │   ├── action_executor.py   # async execute, RobotController/KachakaCommands 分流
 │   │   │   ├── mqtt_service.py      # aiomqtt + Zigbee2MQTT 訊息解析
 │   │   │   ├── button_manager.py    # 配對 + 綁定查詢 + 動作分派
-│   │   │   ├── action_executor.py   # ACTION_MAP → KachakaCommands
+│   │   │   ├── rtt_logger.py        # 背景 RTT + pose 記錄 (poll_count Δ)
 │   │   │   ├── ws_manager.py        # WebSocket 廣播
 │   │   │   └── notifier.py          # Telegram 通知
 │   │   ├── database/
-│   │   │   ├── connection.py        # aiosqlite + WAL
-│   │   │   └── migrations.py        # 版本化 schema
+│   │   │   ├── connection.py        # aiosqlite + WAL + foreign_keys
+│   │   │   └── migrations.py        # V1: 核心表, V2: settings, V3: rtt_logs
 │   │   └── utils/
 │   │       └── logger.py
 │   └── frontend/
-│       ├── index.html               # SPA 入口
+│       ├── index.html
 │       ├── favicon.png
-│       ├── css/style.css            # Vintage Command Terminal 主題
+│       ├── css/style.css            # Vintage Command Terminal 主題 + RWD
 │       └── js/
-│           ├── app.js               # Tab 路由 + FAB 選單 + 工具函式
+│           ├── app.js               # Tab 路由 + FAB 選單
 │           ├── api.js               # REST API 封裝
 │           ├── websocket.js         # WebSocket 自動重連
-│           ├── robots.js            # 機器人管理
+│           ├── robots.js            # 機器人 CRUD
 │           ├── buttons.js           # 按鈕配對
-│           ├── bindings.js          # 綁定設定
-│           ├── logs.js              # 執行記錄 + 通知設定
-│           └── monitor.js           # 地圖 + 鏡頭監控
-├── data/                             # Runtime (gitignored)
-├── zigbee2mqtt/                      # Z2M 設定
-├── mosquitto/                        # Mosquitto 設定
-├── docker-compose.yml                # Dev: local build + live reload
-├── docker-compose.override.yml       # Dev: volume mount
-├── Dockerfile                        # Python 3.12 + uv
+│           ├── bindings.js          # 綁定設定 (含參數驗證)
+│           ├── logs.js              # 執行記錄 + Telegram 設定
+│           └── monitor.js           # 地圖 + CameraStreamer + RTT 熱力圖
+├── data/                             # Runtime data (gitignored)
+├── zigbee2mqtt/                      # Z2M config
+├── mosquitto/                        # Mosquitto config
+├── docker-compose.yml                # Dev: local build
+├── docker-compose.override.yml       # Dev: volume mount + --reload
+├── Dockerfile                        # Python 3.12-slim + uv
 ├── deploy/
-│   ├── docker-compose.yml            # Prod: pull from GHCR
-│   ├── daemon.json                   # Docker IPv4 enforcement
-│   ├── setup.sh                      # 首次部署腳本
+│   ├── docker-compose.yml            # Prod: GHCR image + IPv4 enforcement
+│   ├── daemon.json                   # Docker daemon IPv4
+│   ├── setup.sh                      # 首次部署 + 桌面捷徑
 │   └── .env.example
 ├── .github/workflows/build.yml       # CI: cross-compile amd64+arm64 → GHCR
 ├── requirements.txt
 └── tests/                            # 37 tests
 ```
 
-## 技術棧
-
-| 層級 | 技術 |
-|------|------|
-| Backend | FastAPI, Python 3.12, aiosqlite, aiomqtt |
-| Robot SDK | kachaka-sdk-toolkit (`kachaka_core`) |
-| Frontend | Vanilla JS SPA (無 build tool) |
-| Zigbee | Zigbee2MQTT + Mosquitto |
-| Database | SQLite (WAL mode) + 版本化 migration |
-| Container | Docker Compose, `uv` 套件管理 |
-| CI/CD | GitHub Actions → GHCR (amd64 + arm64) |
-
-## 資料流
-
-### 按鈕按下 → 機器人動作
-
-```mermaid
-sequenceDiagram
-    participant B as SNZB-01
-    participant Z as Zigbee2MQTT
-    participant M as Mosquitto
-    participant S as MQTT Service
-    participant BM as Button Manager
-    participant AE as Action Executor
-    participant R as Kachaka Robot
-
-    B->>Z: Zigbee signal (button press)
-    Z->>M: MQTT publish<br/>zigbee2mqtt/{ieee}<br/>{"action": "single"}
-    M->>S: Subscribe message
-    S->>BM: Parsed button_action event
-    BM->>BM: Query bindings table
-    BM->>AE: Execute(robot_id, action, params)
-    AE->>R: KachakaCommands.move_to_location()
-    R-->>AE: Result {ok: true}
-    AE-->>BM: Result
-    BM->>BM: Write action_logs
-    BM-->>S: WebSocket broadcast
-```
-
-### 按鈕配對流程
-
-```mermaid
-sequenceDiagram
-    participant U as User Browser
-    participant A as FastAPI
-    participant M as Mosquitto
-    participant Z as Zigbee2MQTT
-    participant B as SNZB-01
-
-    U->>A: POST /api/buttons/pair
-    A->>M: Publish permit_join = true (120s)
-    M->>Z: permit_join enabled
-    A-->>U: WebSocket: pair_started
-    B->>Z: Long press (5s) → join network
-    Z->>M: MQTT: device_joined
-    M->>A: Subscribe: device_joined
-    A->>A: Insert into buttons table
-    A-->>U: WebSocket: device_paired
-    U->>U: Refresh button list
-```
-
-## 支援的動作
-
-| 動作 | 參數 | 說明 |
-|------|------|------|
-| `move_to_location` | `name` (從機器人載入) | 移動到指定位置 |
-| `return_home` | — | 回充電座 |
-| `speak` | `text` | 語音播報 |
-| `move_shelf` | `shelf`, `location` (從機器人載入) | 搬運貨架到指定位置 |
-| `return_shelf` | `shelf` (從機器人載入) | 歸還貨架 |
-| `dock_shelf` | — | 對接貨架 |
-| `undock_shelf` | — | 放下貨架 |
-| `start_shortcut` | `shortcut_id` (從機器人載入) | 執行 Kachaka 捷徑 |
-
 ## API
 
 | Method | Endpoint | 說明 |
 |--------|----------|------|
 | GET | `/api/health` | 健康檢查 |
-| GET | `/api/robots` | 機器人列表（含在線狀態、電量、序號） |
-| POST | `/api/robots` | 新增機器人 `{name, ip}` |
-| PUT | `/api/robots/{id}` | 更新機器人 |
-| DELETE | `/api/robots/{id}` | 刪除機器人 |
-| GET | `/api/robots/{id}/locations` | 機器人位置清單 |
-| GET | `/api/robots/{id}/shelves` | 機器人貨架清單 |
-| GET | `/api/robots/{id}/shortcuts` | 機器人捷徑清單 |
-| GET | `/api/robots/{id}/map` | 地圖 + 機器人位置 |
-| GET | `/api/robots/{id}/camera/{front\|back}` | 鏡頭影像 |
-| GET | `/api/buttons` | 按鈕列表 |
-| POST | `/api/buttons/pair` | 啟動配對模式 (120s) |
-| POST | `/api/buttons/pair/stop` | 停止配對 |
-| PUT | `/api/buttons/{id}` | 重命名按鈕 |
-| DELETE | `/api/buttons/{id}` | 移除按鈕 |
-| GET | `/api/bindings/{button_id}` | 按鈕綁定設定 |
-| PUT | `/api/bindings/{button_id}` | 更新綁定 |
-| GET | `/api/logs?page=N` | 執行記錄（分頁） |
-| GET | `/api/system/info` | 系統 IP 資訊 |
-| GET | `/api/settings/notify` | Telegram 通知設定 |
-| PUT | `/api/settings/notify` | 更新通知設定 |
-| POST | `/api/settings/notify/test` | 發送測試通知 |
+| GET/POST/PUT/DELETE | `/api/robots` | 機器人 CRUD |
+| GET | `/api/robots/{id}/locations` | 位置清單 |
+| GET | `/api/robots/{id}/shelves` | 貨架清單 |
+| GET | `/api/robots/{id}/shortcuts` | 捷徑清單 |
+| GET | `/api/robots/{id}/map` | 地圖 + 即時位置 |
+| GET | `/api/robots/{id}/camera/{front\|back}` | 鏡頭影像 (CameraStreamer) |
+| POST | `/api/robots/{id}/camera/{cam}/start` | 啟動 CameraStreamer |
+| POST | `/api/robots/{id}/camera/{cam}/stop` | 停止 CameraStreamer |
+| GET | `/api/robots/{id}/rtt-heatmap` | RTT 資料點 + 統計 |
+| DELETE | `/api/robots/{id}/rtt-heatmap` | 清除 RTT 資料 |
+| GET/DELETE | `/api/buttons` | 按鈕列表/移除 |
+| POST | `/api/buttons/pair` | 啟動配對 (120s) |
+| PUT | `/api/buttons/{id}` | 重命名 |
+| GET/PUT | `/api/bindings/{button_id}` | 綁定設定 |
+| GET | `/api/logs?page=N` | 執行記錄 (分頁) |
+| GET | `/api/system/info` | 系統 URL |
+| GET/PUT | `/api/settings/notify` | Telegram 設定 |
+| POST | `/api/settings/notify/test` | 測試通知 |
 | WS | `/ws` | WebSocket 即時事件 |
-
-## 部署
-
-### 更新生產環境
-
-```bash
-ssh sigma@<PI_IP> "cd /opt/app/pi-zigbee && docker compose pull && docker compose up -d"
-```
 
 ## 測試
 
 ```bash
-# 建立虛擬環境
 uv venv .venv && uv pip install -r requirements.txt
-
-# 執行所有測試
 .venv/bin/pytest tests/ -v
-
-# 37 tests covering:
-# - Database migrations + constraints
-# - WebSocket manager
-# - Robot manager
-# - Action executor (8 actions)
-# - MQTT message parsing (8 scenarios)
-# - Button manager (pairing + dispatch)
-# - API endpoints (CRUD + bindings)
-# - Integration (full button→robot flow)
+# 37 tests: database, ws_manager, robot_manager, action_executor,
+#           mqtt_service, button_manager, api, integration
 ```
 
 ## License
