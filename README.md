@@ -252,15 +252,6 @@ docker compose up --build
 | 控制介面 | `http://<PI_IP>:8000` | Web UI 主介面 |
 | Zigbee2MQTT | `http://<PI_IP>:8080` | Zigbee 裝置管理 |
 
-### 環境變數
-
-| 變數 | 預設值 | 說明 |
-|------|--------|------|
-| `MQTT_HOST` | `mosquitto` | MQTT broker 位址 |
-| `MQTT_PORT` | `1883` | MQTT broker 連接埠 |
-| `ZIGBEE_DEVICE` | `/dev/zigbee` | Zigbee USB dongle 裝置路徑 (udev symlink) |
-| `TZ` | `Asia/Taipei` | 時區 |
-
 ## 專案結構
 
 ```
@@ -315,7 +306,6 @@ sigma-button-controller/
 ├── docker-compose.override.yml      # 開發用: volume mount + --reload
 ├── Dockerfile                       # Python 3.12-slim + uv
 ├── .github/workflows/build.yml      # CI: cross-compile amd64+arm64 → GHCR
-├── .env.example
 └── requirements.txt
 ```
 

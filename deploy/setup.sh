@@ -57,11 +57,6 @@ permit_join: false
 CONF
 fi
 
-if [ ! -f "$APP_DIR/.env" ]; then
-    cp .env.example "$APP_DIR/.env"
-    echo "Created .env from template. Edit $APP_DIR/.env if needed."
-fi
-
 # Create desktop shortcut
 DESKTOP_DIR="$HOME/Desktop"
 if [ -d "$DESKTOP_DIR" ]; then
@@ -81,5 +76,4 @@ echo ""
 echo "=== Setup complete ==="
 echo "Next steps:"
 echo "  1. Verify Zigbee dongle: ls /dev/ttyACM* /dev/ttyUSB*"
-echo "  2. Edit $APP_DIR/.env if the device path differs"
-echo "  3. cd $APP_DIR && docker compose pull && docker compose up -d"
+echo "  2. cd $APP_DIR && docker compose pull && docker compose up -d"
