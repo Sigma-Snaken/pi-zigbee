@@ -10,14 +10,15 @@ logger = get_logger("rtt_logger")
 
 
 class RTTLogger:
-    """Periodically records RTT + pose from RobotController to DB."""
+    """Records RTT + pose when RobotController has new poll data."""
 
     def __init__(self, db: aiosqlite.Connection, robot_manager: RobotManager, interval: float = 5.0):
         self._db = db
         self._rm = robot_manager
         self._interval = interval
         self._task: asyncio.Task | None = None
-        self._serials: dict[str, str] = {}  # robot_id -> serial
+        self._serials: dict[str, str] = {}
+        self._last_poll_count: dict[str, int] = {}  # robot_id -> last seen poll_count
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._loop())
@@ -50,19 +51,25 @@ class RTTLogger:
                 continue
 
             try:
-                state = svc.controller.state
-                if state is None:
-                    continue
-
-                # Get latest RTT from metrics
                 metrics = svc.controller.metrics
+                poll_count = metrics.poll_count if hasattr(metrics, 'poll_count') else 0
+
+                # Only record if poll_count changed (new data from controller)
+                last = self._last_poll_count.get(robot_id, 0)
+                if poll_count <= last:
+                    continue
+                self._last_poll_count[robot_id] = poll_count
+
                 rtt_list = metrics.poll_rtt_list if hasattr(metrics, 'poll_rtt_list') else []
                 if not rtt_list:
                     continue
 
-                rtt_ms = rtt_list[-1]  # Latest RTT
+                rtt_ms = rtt_list[-1]
 
-                # Get pose + battery from state
+                state = svc.controller.state
+                if state is None:
+                    continue
+
                 x = getattr(state, 'pose_x', None)
                 y = getattr(state, 'pose_y', None)
                 theta = getattr(state, 'pose_theta', None) or 0.0
@@ -70,7 +77,7 @@ class RTTLogger:
                 if x is None or y is None:
                     continue
 
-                # Get serial (cache it)
+                # Cache serial
                 serial = self._serials.get(robot_id)
                 if not serial and svc.conn:
                     try:
