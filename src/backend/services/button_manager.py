@@ -104,7 +104,7 @@ class ButtonManager:
         params = json.loads(params_json) if params_json else {}
 
         logger.info(f"Button {ieee} trigger={trigger} -> {action} on {robot_id}")
-        result = self._executor.execute(robot_id, action, params)
+        result = await self._executor.execute(robot_id, action, params)
 
         now = datetime.now(timezone.utc).isoformat()
         await self._db.execute(
