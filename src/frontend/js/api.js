@@ -31,6 +31,8 @@ export const api = {
     // Monitor
     getMap: (id) => request('GET', `/robots/${id}/map`),
     getCamera: (id, camera) => request('GET', `/robots/${id}/camera/${camera}`),
+    startCamera: (id, camera) => request('POST', `/robots/${id}/camera/${camera}/start`),
+    stopCamera: (id, camera) => request('POST', `/robots/${id}/camera/${camera}/stop`),
     getMetrics: (id) => request('GET', `/robots/${id}/metrics`),
     getRttHeatmap: (id, limit = 500) => request('GET', `/robots/${id}/rtt-heatmap?limit=${limit}`),
     clearRttHeatmap: (id) => request('DELETE', `/robots/${id}/rtt-heatmap`),

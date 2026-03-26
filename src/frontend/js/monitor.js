@@ -227,19 +227,21 @@ function drawMap(map, pose) {
     img.src = `data:image/${map.format || 'png'};base64,${map.image_base64}`;
 }
 
-function toggleCamera(robotId, camera, btn) {
+async function toggleCamera(robotId, camera, btn) {
     const containerId = camera === 'front' ? 'front-cam-container' : 'back-cam-container';
     const camContainer = document.getElementById(containerId);
     if (btn.textContent === '開啟') {
         btn.textContent = '關閉';
         btn.classList.add('btn-danger');
         btn.classList.remove('btn-success');
+        await api.startCamera(robotId, camera);  // Start CameraStreamer on backend
         startCameraStream(robotId, camera, camContainer);
     } else {
         btn.textContent = '開啟';
         btn.classList.remove('btn-danger');
         btn.classList.add('btn-success');
         stopCameraStream(camera);
+        await api.stopCamera(robotId, camera);  // Stop CameraStreamer on backend
         camContainer.innerHTML = '<p style="color:var(--text-muted);font-size:11px;padding:1rem;">鏡頭已關閉</p>';
     }
 }

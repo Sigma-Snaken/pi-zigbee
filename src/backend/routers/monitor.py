@@ -47,9 +47,20 @@ async def get_camera(robot_id: str, camera: str):
     if not rm:
         raise HTTPException(503, "Robot manager not available")
     svc = rm.get(robot_id)
-    if not svc or not svc.queries:
+    if not svc:
         raise HTTPException(404, f"Robot '{robot_id}' not connected")
     try:
+        # Use CameraStreamer (background thread) if running
+        streamer = svc.front_streamer if camera == "front" else svc.back_streamer
+        if streamer and streamer.is_running:
+            frame = streamer.latest_frame
+            if frame and frame.get("ok"):
+                return {
+                    "ok": True,
+                    "image_base64": frame.get("image_base64"),
+                    "format": frame.get("format", "jpeg"),
+                }
+        # Fallback: direct query (shouldn't happen if streamer is managed properly)
         if camera == "front":
             img = svc.queries.get_front_camera_image()
         else:
@@ -61,6 +72,34 @@ async def get_camera(robot_id: str, camera: str):
         }
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+@router.post("/robots/{robot_id}/camera/{camera}/start")
+async def start_camera(robot_id: str, camera: str):
+    if camera not in ("front", "back"):
+        raise HTTPException(400, "Camera must be 'front' or 'back'")
+    rm = _state.get("robot_manager")
+    if not rm:
+        raise HTTPException(503, "Robot manager not available")
+    svc = rm.get(robot_id)
+    if not svc:
+        raise HTTPException(404, f"Robot '{robot_id}' not connected")
+    svc.start_streamer(camera)
+    return {"ok": True}
+
+
+@router.post("/robots/{robot_id}/camera/{camera}/stop")
+async def stop_camera(robot_id: str, camera: str):
+    if camera not in ("front", "back"):
+        raise HTTPException(400, "Camera must be 'front' or 'back'")
+    rm = _state.get("robot_manager")
+    if not rm:
+        raise HTTPException(503, "Robot manager not available")
+    svc = rm.get(robot_id)
+    if not svc:
+        raise HTTPException(404, f"Robot '{robot_id}' not connected")
+    svc.stop_streamer(camera)
+    return {"ok": True}
 
 
 @router.get("/robots/{robot_id}/metrics")
