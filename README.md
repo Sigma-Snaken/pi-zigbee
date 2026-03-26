@@ -197,7 +197,7 @@ sequenceDiagram
 
 ```bash
 # 1. 下載部署檔案
-curl -L https://github.com/Sigma-Snaken/sigma-button-controller/archive/refs/heads/main.tar.gz | tar xz --strip=2 sigma-button-controller-main/deploy
+curl -L https://github.com/Sigma-Snaken/sigma-button-controller/archive/refs/heads/main.tar.gz | tar xz --strip=1 sigma-button-controller-main/deploy
 cd deploy
 
 # 2. 執行首次設定 (安裝 Docker、udev rule、建立目錄、桌面捷徑)
