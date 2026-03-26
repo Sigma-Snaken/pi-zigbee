@@ -1,8 +1,6 @@
 from kachaka_core.connection import KachakaConnection
 from kachaka_core.commands import KachakaCommands
 from kachaka_core.queries import KachakaQueries
-from kachaka_core.camera import CameraStreamer
-from kachaka_core.detection import ObjectDetector
 from kachaka_core.controller import RobotController
 
 from utils.logger import get_logger
@@ -19,10 +17,7 @@ class RobotService:
         self.conn = None
         self.commands: KachakaCommands | None = None
         self.queries: KachakaQueries | None = None
-        self.detector: ObjectDetector | None = None
         self.controller: RobotController | None = None
-        self.front_streamer: CameraStreamer | None = None
-        self.back_streamer: CameraStreamer | None = None
 
     def connect(self, connect_fn=None, commands_cls=None, queries_cls=None) -> dict:
         _connect = connect_fn or KachakaConnection.get
@@ -34,61 +29,17 @@ class RobotService:
         result = self.conn.ping()
         logger.info(f"Connected to robot {self.robot_id} at {self.ip}: {result.get('serial', 'unknown')}")
 
-        # Initialize detection + controller (only with real connections)
+        # Initialize RobotController for background polling + metrics
         try:
-            self.detector = ObjectDetector(self.conn)
             self.controller = RobotController(self.conn)
-            self.controller.start()  # Start background polling (pose + battery)
-            logger.info(f"ObjectDetector + RobotController started for {self.robot_id}")
+            self.controller.start()
+            logger.info(f"RobotController started for {self.robot_id}")
         except Exception as e:
-            logger.warning(f"Could not init detector/controller for {self.robot_id}: {e}")
+            logger.warning(f"Could not init RobotController for {self.robot_id}: {e}")
 
         return result
 
-    def start_streamer(self, camera: str, detect: bool = False) -> CameraStreamer | None:
-        """Start a CameraStreamer. Returns existing one if already running."""
-        if camera == "front":
-            if self.front_streamer and self.front_streamer.is_running:
-                return self.front_streamer
-            self.front_streamer = CameraStreamer(
-                self.conn, interval=1.0, camera="front",
-                detect=detect, annotate=detect,
-            )
-            self.front_streamer.start()
-            logger.info(f"Front CameraStreamer started for {self.robot_id} (detect={detect})")
-            return self.front_streamer
-        else:
-            if self.back_streamer and self.back_streamer.is_running:
-                return self.back_streamer
-            self.back_streamer = CameraStreamer(
-                self.conn, interval=1.0, camera="back",
-                detect=detect, annotate=detect,
-            )
-            self.back_streamer.start()
-            logger.info(f"Back CameraStreamer started for {self.robot_id} (detect={detect})")
-            return self.back_streamer
-
-    def stop_streamer(self, camera: str) -> None:
-        if camera == "front" and self.front_streamer:
-            self.front_streamer.stop()
-            self.front_streamer = None
-        elif camera == "back" and self.back_streamer:
-            self.back_streamer.stop()
-            self.back_streamer = None
-
     def stop(self) -> None:
-        if self.front_streamer:
-            try:
-                self.front_streamer.stop()
-            except Exception:
-                pass
-            self.front_streamer = None
-        if self.back_streamer:
-            try:
-                self.back_streamer.stop()
-            except Exception:
-                pass
-            self.back_streamer = None
         if self.controller:
             try:
                 self.controller.stop()

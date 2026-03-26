@@ -13,6 +13,7 @@ from services.action_executor import ActionExecutor
 from services.button_manager import ButtonManager
 from services.mqtt_service import MQTTService
 from services.notifier import TelegramNotifier
+from services.rtt_logger import RTTLogger
 from utils.logger import get_logger
 
 logger = get_logger("main")
@@ -61,6 +62,10 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"Failed to connect robot {row[0]} at {row[1]}: {e}")
 
+    # Start RTT logger
+    rtt_logger = RTTLogger(db, robot_manager, interval=5.0)
+    await rtt_logger.start()
+
     _state.update({
         "db": db,
         "ws_manager": ws_manager,
@@ -69,10 +74,12 @@ async def lifespan(app: FastAPI):
         "button_manager": button_manager,
         "mqtt_service": mqtt_service,
         "notifier": notifier,
+        "rtt_logger": rtt_logger,
     })
 
     yield
 
+    await rtt_logger.stop()
     if mqtt_service:
         await mqtt_service.stop()
     robot_manager.stop_all()

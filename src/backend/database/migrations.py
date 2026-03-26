@@ -48,6 +48,22 @@ MIGRATIONS = [
         value TEXT NOT NULL
     );
     """,
+    # V3: RTT logs for signal quality mapping
+    """
+    CREATE TABLE IF NOT EXISTS rtt_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        robot_name TEXT NOT NULL,
+        serial TEXT,
+        x REAL NOT NULL,
+        y REAL NOT NULL,
+        theta REAL NOT NULL,
+        battery REAL,
+        rtt_ms REAL NOT NULL,
+        recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_rtt_robot ON rtt_logs(robot_name);
+    CREATE INDEX IF NOT EXISTS idx_rtt_time ON rtt_logs(recorded_at);
+    """,
 ]
 
 
