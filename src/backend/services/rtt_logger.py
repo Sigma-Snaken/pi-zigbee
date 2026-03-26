@@ -54,17 +54,20 @@ class RTTLogger:
                 metrics = svc.controller.metrics
                 poll_count = metrics.poll_count if hasattr(metrics, 'poll_count') else 0
 
-                # Only record if poll_count changed (new data from controller)
+                # Only record new polls since last check
                 last = self._last_poll_count.get(robot_id, 0)
                 if poll_count <= last:
                     continue
-                self._last_poll_count[robot_id] = poll_count
 
                 rtt_list = metrics.poll_rtt_list if hasattr(metrics, 'poll_rtt_list') else []
                 if not rtt_list:
+                    self._last_poll_count[robot_id] = poll_count
                     continue
 
-                rtt_ms = rtt_list[-1]
+                # Get all new RTT entries since last check
+                new_count = poll_count - last
+                new_rtts = rtt_list[-new_count:] if new_count <= len(rtt_list) else rtt_list
+                self._last_poll_count[robot_id] = poll_count
 
                 state = svc.controller.state
                 if state is None:
@@ -88,11 +91,12 @@ class RTTLogger:
                         serial = ""
 
                 now = datetime.now(timezone.utc).isoformat()
-                await self._db.execute(
-                    "INSERT INTO rtt_logs (robot_name, serial, x, y, theta, battery, rtt_ms, recorded_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (svc.robot_id, serial, x, y, theta, battery, rtt_ms, now),
-                )
+                for rtt_ms in new_rtts:
+                    await self._db.execute(
+                        "INSERT INTO rtt_logs (robot_name, serial, x, y, theta, battery, rtt_ms, recorded_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (svc.robot_id, serial, x, y, theta, battery, rtt_ms, now),
+                    )
                 await self._db.commit()
             except Exception as e:
                 logger.warning(f"Failed to record RTT for {robot_id}: {e}")
