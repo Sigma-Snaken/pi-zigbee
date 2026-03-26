@@ -5,7 +5,6 @@ const container = document.getElementById('monitor');
 let mapTimer = null;
 let frontCamTimer = null;
 let backCamTimer = null;
-let metricsTimer = null;
 let heatmapData = null;
 let showHeatmap = false;
 
@@ -76,14 +75,6 @@ async function renderMonitor() {
                         </div>
                     </div>
                 </div>
-                <div class="monitor-section" style="margin-top:1rem">
-                    <div class="monitor-section-header">
-                        <span class="monitor-label">效能指標</span>
-                    </div>
-                    <div id="perf-panel" style="background:var(--panel-mid);border:1px solid var(--border-subtle);border-radius:4px;padding:0.75rem">
-                        <div id="perf-list" style="font-size:11px;color:var(--text-muted)">載入中...</div>
-                    </div>
-                </div>
             </div>
             `}
         </div>
@@ -96,7 +87,6 @@ async function renderMonitor() {
         stopAllStreams();
         heatmapData = null;
         loadMap(sel.value);
-        loadMetrics(sel.value);
         resetCamButtons();
     });
 
@@ -125,7 +115,6 @@ async function renderMonitor() {
     });
 
     loadMap(sel.value);
-    loadMetrics(sel.value);
 }
 
 function rttToColor(rtt) {
@@ -267,33 +256,6 @@ function startCameraStream(robotId, camera, camContainer) {
     else { backCamTimer = setInterval(fetchFrame, 2000); }
 }
 
-async function loadMetrics(robotId) {
-    if (metricsTimer) { clearInterval(metricsTimer); metricsTimer = null; }
-    const update = async () => {
-        try {
-            const data = await api.getMetrics(robotId);
-            if (!data.ok) return;
-            const panel = document.getElementById('perf-list');
-            if (!panel) return;
-            let html = '';
-            if (data.controller) {
-                const c = data.controller;
-                html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.5rem">
-                    <div><span style="color:var(--text-muted)">輪詢次數</span><br><span style="color:var(--text-primary);font-size:13px">${c.poll_count}</span></div>
-                    <div><span style="color:var(--text-muted)">即時 RTT</span><br><span style="color:var(--text-primary);font-size:13px">${c.latest_rtt_ms}ms</span></div>
-                    <div><span style="color:var(--text-muted)">平均 RTT</span><br><span style="color:var(--text-primary);font-size:13px">${c.avg_rtt_ms}ms</span></div>
-                    <div><span style="color:var(--text-muted)">最大 RTT</span><br><span style="color:var(--text-primary);font-size:13px">${c.max_rtt_ms}ms</span></div>
-                </div>`;
-            } else {
-                html = '<span style="color:var(--text-ghost)">RobotController 未啟動</span>';
-            }
-            panel.innerHTML = html;
-        } catch (e) { console.error('Metrics error:', e); }
-    };
-    await update();
-    metricsTimer = setInterval(update, 5000);
-}
-
 function stopCameraStream(camera) {
     if (camera === 'front' && frontCamTimer) { clearInterval(frontCamTimer); frontCamTimer = null; }
     if (camera === 'back' && backCamTimer) { clearInterval(backCamTimer); backCamTimer = null; }
@@ -303,7 +265,6 @@ function stopAllStreams() {
     if (mapTimer) { clearInterval(mapTimer); mapTimer = null; }
     if (frontCamTimer) { clearInterval(frontCamTimer); frontCamTimer = null; }
     if (backCamTimer) { clearInterval(backCamTimer); backCamTimer = null; }
-    if (metricsTimer) { clearInterval(metricsTimer); metricsTimer = null; }
 }
 
 function resetCamButtons() {
