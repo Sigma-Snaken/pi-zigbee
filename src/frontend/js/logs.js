@@ -7,7 +7,10 @@ function parseError(detail) {
     if (!detail) return '';
     try {
         const d = typeof detail === 'string' ? JSON.parse(detail) : detail;
-        if (d.error_code) return `[${d.error_code}] ${d.error || ''}`;
+        if (d.error_code) {
+            const msg = (d.error || '').replace(/^error_code=\d+:\s*/, '');
+            return `[${d.error_code}] ${msg}`;
+        }
         if (d.error) return d.error;
         return '';
     } catch { return String(detail); }
