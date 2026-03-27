@@ -107,7 +107,7 @@ ROUTES = {
     ("GET", "/status"): lambda _: wifi_status(),
     ("POST", "/scan"): lambda _: wifi_scan(),
     ("POST", "/connect"): lambda b: wifi_connect(b["ssid"], b.get("password", "")),
-    ("POST", "/hotspot/start"): lambda b: hotspot_start(b.get("ssid", "SIGMA-SETUP"), b.get("password", "88888888")),
+    ("POST", "/hotspot/start"): lambda b: hotspot_start(b.get("ssid", "SIGMA-SETUP"), b.get("password", "")),
     ("POST", "/hotspot/stop"): lambda _: hotspot_stop(),
 }
 

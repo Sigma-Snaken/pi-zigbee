@@ -63,7 +63,7 @@ async function renderWifi() {
                     </div>
                     <div class="form-group form-inline">
                         <label>密碼</label>
-                        <input id="ap-pass" value="88888888" type="password" />
+                        <input id="ap-pass" value="" type="password" placeholder="留空為開放網路" />
                     </div>
                     <button class="btn btn-primary" id="hotspot-start">啟動 AP</button>
                 `}
@@ -162,8 +162,8 @@ async function doConnect(ssid, password) {
 async function startHotspot() {
     const ssid = container.querySelector('#ap-ssid').value.trim();
     const password = container.querySelector('#ap-pass').value.trim();
-    if (password.length < 8) {
-        showToast('AP 密碼至少 8 碼', 'error');
+    if (password && password.length < 8) {
+        showToast('AP 密碼至少 8 碼或留空', 'error');
         return;
     }
     try {
