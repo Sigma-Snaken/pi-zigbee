@@ -62,8 +62,11 @@ async function renderWifi() {
                         <input id="ap-ssid" value="SIGMA-SETUP" />
                     </div>
                     <div class="form-group form-inline">
+                        <label><input type="checkbox" id="ap-open" checked> 開放網路</label>
+                    </div>
+                    <div class="form-group form-inline" id="ap-pass-group" style="display:none">
                         <label>密碼</label>
-                        <input id="ap-pass" value="" type="password" placeholder="留空為開放網路" />
+                        <input id="ap-pass" value="" type="password" placeholder="至少 8 碼" />
                     </div>
                     <button class="btn btn-primary" id="hotspot-start">啟動 AP</button>
                 `}
@@ -87,6 +90,9 @@ async function renderWifi() {
     if (isAP) {
         container.querySelector('#hotspot-stop').onclick = stopHotspot;
     } else {
+        const openCb = container.querySelector('#ap-open');
+        const passGroup = container.querySelector('#ap-pass-group');
+        openCb.onchange = () => { passGroup.style.display = openCb.checked ? 'none' : 'flex'; };
         container.querySelector('#hotspot-start').onclick = startHotspot;
     }
 }
@@ -161,9 +167,10 @@ async function doConnect(ssid, password) {
 
 async function startHotspot() {
     const ssid = container.querySelector('#ap-ssid').value.trim();
-    const password = container.querySelector('#ap-pass').value.trim();
-    if (password && password.length < 8) {
-        showToast('AP 密碼至少 8 碼或留空', 'error');
+    const isOpen = container.querySelector('#ap-open').checked;
+    const password = isOpen ? '' : container.querySelector('#ap-pass').value.trim();
+    if (!isOpen && password.length < 8) {
+        showToast('密碼至少 8 碼', 'error');
         return;
     }
     try {
