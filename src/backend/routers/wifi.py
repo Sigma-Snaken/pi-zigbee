@@ -1,64 +1,45 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
+"""Proxy WiFi requests to the host wifi-agent (127.0.0.1:8001)."""
 
-from services.wifi_manager import WifiManager
-from utils.logger import get_logger
+import httpx
+from fastapi import APIRouter, Request
 
-logger = get_logger("routers.wifi")
 router = APIRouter()
-wifi = WifiManager()
+
+AGENT = "http://127.0.0.1:8001"
 
 
-class WifiConnectRequest(BaseModel):
-    ssid: str
-    password: str = ""
-
-
-class HotspotRequest(BaseModel):
-    ssid: str = "SIGMA-SETUP"
-    password: str = "88888888"
+async def _proxy(method: str, path: str, body: dict | None = None):
+    async with httpx.AsyncClient(timeout=30) as client:
+        if method == "GET":
+            resp = await client.get(f"{AGENT}{path}")
+        else:
+            resp = await client.post(f"{AGENT}{path}", json=body or {})
+    return resp.json()
 
 
 @router.get("/wifi/status")
 async def wifi_status():
-    try:
-        return await wifi.status()
-    except Exception as e:
-        return {"connected": False, "ssid": "", "ip": "", "signal": 0,
-                "mode": "unknown", "error": str(e)}
+    return await _proxy("GET", "/status")
 
 
 @router.post("/wifi/scan")
 async def wifi_scan():
-    try:
-        networks = await wifi.scan()
-        return {"networks": networks}
-    except Exception as e:
-        return {"networks": [], "error": str(e)}
+    return await _proxy("POST", "/scan")
 
 
 @router.post("/wifi/connect")
-async def wifi_connect(body: WifiConnectRequest):
-    try:
-        await wifi.connect_wifi(body.ssid, body.password)
-        return {"ok": True, "message": f"正在連線至 {body.ssid}..."}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+async def wifi_connect(request: Request):
+    return await _proxy("POST", "/connect", await request.json())
 
 
 @router.post("/wifi/hotspot/start")
-async def hotspot_start(body: HotspotRequest = HotspotRequest()):
-    try:
-        await wifi.start_hotspot(body.ssid, body.password)
-        return {"ok": True, "message": f"AP 已啟動: {body.ssid}"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+async def hotspot_start(request: Request):
+    body = {}
+    if request.headers.get("content-length", "0") != "0":
+        body = await request.json()
+    return await _proxy("POST", "/hotspot/start", body)
 
 
 @router.post("/wifi/hotspot/stop")
 async def hotspot_stop():
-    try:
-        await wifi.stop_hotspot()
-        return {"ok": True, "message": "AP 已關閉"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    return await _proxy("POST", "/hotspot/stop")

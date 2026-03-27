@@ -3,25 +3,13 @@ set -euo pipefail
 
 echo "=== Sigma Button Controller — First-time Setup ==="
 
-# ── Docker (for Mosquitto + Zigbee2MQTT) ──
+# ── Docker ──
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker..."
     curl -fsSL https://get.docker.com | sh
     sudo usermod -aG docker "$USER"
     echo "Docker installed. Please log out and back in, then re-run this script."
     exit 0
-fi
-
-# ── Python + uv (for FastAPI app) ──
-if ! command -v python3 &> /dev/null; then
-    echo "Installing Python..."
-    sudo apt-get update && sudo apt-get install -y python3 python3-venv
-fi
-
-if ! command -v uv &> /dev/null; then
-    echo "Installing uv..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 # ── Zigbee dongle udev rule ──
@@ -41,16 +29,6 @@ sudo chown "$USER:$USER" "$APP_DIR"
 
 cp docker-compose.yml "$APP_DIR/"
 mkdir -p "$APP_DIR/data" "$APP_DIR/mosquitto" "$APP_DIR/zigbee2mqtt"
-
-# ── Download app source ──
-echo "Downloading app source..."
-curl -L https://github.com/Sigma-Snaken/sigma-button-controller/archive/refs/heads/main.tar.gz \
-    | tar xz --strip=1 -C "$APP_DIR" sigma-button-controller-main/src sigma-button-controller-main/requirements.txt
-
-# ── Python venv + dependencies ──
-echo "Installing Python dependencies..."
-uv venv "$APP_DIR/.venv"
-uv pip install --python "$APP_DIR/.venv/bin/python" -r "$APP_DIR/requirements.txt"
 
 # ── Mosquitto config ──
 if [ ! -f "$APP_DIR/mosquitto/mosquitto.conf" ]; then
@@ -80,8 +58,11 @@ permit_join: false
 CONF
 fi
 
-# ── Polkit rule for WiFi management ──
-echo "Setting up WiFi management permissions..."
+# ── WiFi agent (host service, stdlib only) ──
+echo "Installing WiFi agent..."
+cp wifi-agent.py "$APP_DIR/"
+
+# Polkit rule for NetworkManager access
 sudo tee /etc/polkit-1/rules.d/50-sigma-wifi.rules > /dev/null << 'RULE'
 polkit.addRule(function(action, subject) {
     if (action.id.indexOf("org.freedesktop.NetworkManager") === 0 &&
@@ -91,11 +72,9 @@ polkit.addRule(function(action, subject) {
 });
 RULE
 
-# ── Systemd service ──
-echo "Installing systemd service..."
-sudo cp sigma-app.service /etc/systemd/system/
+sudo cp sigma-wifi.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable sigma-app
+sudo systemctl enable sigma-wifi
 
 # ── Desktop shortcut ──
 DESKTOP_DIR="$HOME/Desktop"
@@ -117,4 +96,4 @@ echo "=== Setup complete ==="
 echo "Next steps:"
 echo "  1. Verify Zigbee dongle: ls -la /dev/zigbee"
 echo "  2. cd $APP_DIR && docker compose pull && docker compose up -d"
-echo "  3. sudo systemctl start sigma-app"
+echo "  3. sudo systemctl start sigma-wifi"
