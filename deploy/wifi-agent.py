@@ -151,6 +151,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    server = HTTPServer(("127.0.0.1", 8001), Handler)
-    print("WiFi agent listening on 127.0.0.1:8001")
+    server = HTTPServer(("0.0.0.0", 8001), Handler)
+    print("WiFi agent listening on 0.0.0.0:8001")
     server.serve_forever()
