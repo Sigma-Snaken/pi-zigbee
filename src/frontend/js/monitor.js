@@ -228,7 +228,6 @@ async function toggleCamera(robotId, camera, btn) {
         btn.textContent = '關閉';
         btn.classList.add('btn-danger');
         btn.classList.remove('btn-success');
-        await api.startCamera(robotId, camera);  // Start CameraStreamer on backend
         startCameraStream(robotId, camera, camContainer);
     } else {
         btn.textContent = '開啟';
@@ -241,29 +240,18 @@ async function toggleCamera(robotId, camera, btn) {
 }
 
 function startCameraStream(robotId, camera, camContainer) {
-    camContainer.innerHTML = `<img id="${camera}-cam-img" style="width:100%;max-width:400px;border-radius:4px;display:block;" /><p style="color:var(--text-muted);font-size:10px;margin-top:0.25rem" id="${camera}-cam-status">載入中...</p>`;
-    const fetchFrame = async () => {
-        try {
-            const data = await api.getCamera(robotId, camera);
-            if (data.ok) {
-                const img = document.getElementById(camera + '-cam-img');
-                if (img) img.src = `data:image/${data.format};base64,${data.image_base64}`;
-                const status = document.getElementById(camera + '-cam-status');
-                if (status) status.textContent = new Date().toLocaleTimeString('zh-TW', { hour12: false });
-            }
-        } catch (e) {
-            const status = document.getElementById(camera + '-cam-status');
-            if (status) status.textContent = '錯誤: ' + e.message;
-        }
-    };
-    fetchFrame();
-    if (camera === 'front') { frontCamTimer = setInterval(fetchFrame, 200); }
-    else { backCamTimer = setInterval(fetchFrame, 200); }
+    const streamUrl = `/api/robots/${robotId}/camera/${camera}/stream`;
+    camContainer.innerHTML = `<img id="${camera}-cam-img" src="${streamUrl}" style="width:100%;max-width:400px;border-radius:4px;display:block;" />`;
+    if (camera === 'front') frontCamTimer = 1;
+    else backCamTimer = 1;
 }
 
 function stopCameraStream(camera) {
-    if (camera === 'front' && frontCamTimer) { clearInterval(frontCamTimer); frontCamTimer = null; }
-    if (camera === 'back' && backCamTimer) { clearInterval(backCamTimer); backCamTimer = null; }
+    // Remove img src to stop stream connection
+    const img = document.getElementById(camera + '-cam-img');
+    if (img) img.removeAttribute('src');
+    if (camera === 'front') frontCamTimer = null;
+    else backCamTimer = null;
 }
 
 function stopAllStreams() {

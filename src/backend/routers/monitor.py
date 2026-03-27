@@ -1,6 +1,8 @@
 import asyncio
+import base64
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from main import _state
 from utils.logger import get_logger
@@ -71,6 +73,40 @@ async def get_camera(robot_id: str, camera: str):
         "image_base64": frame.get("image_base64"),
         "format": frame.get("format", "jpeg"),
     }
+
+
+@router.get("/robots/{robot_id}/camera/{camera}/stream")
+async def camera_stream(robot_id: str, camera: str):
+    """MJPEG stream — use as <img src="...">."""
+    if camera not in ("front", "back"):
+        raise HTTPException(400, "Camera must be 'front' or 'back'")
+    rm = _state.get("robot_manager")
+    if not rm:
+        raise HTTPException(503, "Robot manager not available")
+    svc = rm.get(robot_id)
+    if not svc:
+        raise HTTPException(404, f"Robot '{robot_id}' not connected")
+    streamer = svc.front_streamer if camera == "front" else svc.back_streamer
+    if not streamer or not streamer.is_running:
+        svc.start_streamer(camera)
+        streamer = svc.front_streamer if camera == "front" else svc.back_streamer
+
+    async def generate():
+        last_b64 = None
+        while streamer and streamer.is_running:
+            frame = streamer.latest_frame
+            if frame and frame.get("ok") and frame.get("image_base64") != last_b64:
+                last_b64 = frame["image_base64"]
+                jpeg = base64.b64decode(last_b64)
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n"
+                    b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n"
+                    + jpeg + b"\r\n"
+                )
+            await asyncio.sleep(0.05)
+
+    return StreamingResponse(generate(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 @router.post("/robots/{robot_id}/camera/{camera}/start")
