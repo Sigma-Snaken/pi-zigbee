@@ -5,7 +5,8 @@ from fastapi import APIRouter, Request
 
 router = APIRouter()
 
-AGENT = "http://127.0.0.1:8001"
+import os
+AGENT = os.environ.get("WIFI_AGENT_URL", "http://127.0.0.1:8001")
 
 
 async def _proxy(method: str, path: str, body: dict | None = None):

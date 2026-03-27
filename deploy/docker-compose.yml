@@ -27,9 +27,12 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
+      - WIFI_AGENT_URL=http://host.docker.internal:8001
       - TZ=Asia/Taipei
     depends_on:
       - mosquitto
