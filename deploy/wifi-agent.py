@@ -150,7 +150,23 @@ class Handler(BaseHTTPRequestHandler):
         pass  # silent
 
 
+async def auto_ap_on_boot(timeout=30):
+    """Wait for WiFi connection; if none after timeout, start AP."""
+    import time
+    print(f"Waiting {timeout}s for WiFi connection...")
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        status = await wifi_status()
+        if status["connected"] and status["mode"] == "client":
+            print(f"WiFi connected: {status['ssid']} ({status['ip']})")
+            return
+        await asyncio.sleep(3)
+    print("No WiFi connection — starting AP hotspot (SIGMA-SETUP)")
+    await hotspot_start("SIGMA-SETUP", "")
+
+
 if __name__ == "__main__":
+    asyncio.run(auto_ap_on_boot())
     server = HTTPServer(("0.0.0.0", 8001), Handler)
     print("WiFi agent listening on 0.0.0.0:8001")
     server.serve_forever()
