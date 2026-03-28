@@ -62,11 +62,11 @@ async function renderWifi() {
                         <input id="ap-ssid" value="SIGMA-SETUP" />
                     </div>
                     <div class="form-group form-inline">
-                        <label><input type="checkbox" id="ap-open" checked> 開放網路</label>
-                    </div>
-                    <div class="form-group form-inline" id="ap-pass-group" style="display:none">
                         <label>密碼</label>
-                        <input id="ap-pass" value="" type="password" placeholder="至少 8 碼" />
+                        <input id="ap-pass" value="" type="password" placeholder="至少 8 碼" disabled />
+                    </div>
+                    <div class="form-group form-inline">
+                        <label><input type="checkbox" id="ap-open" checked> 開放網路</label>
                     </div>
                     <button class="btn btn-primary" id="hotspot-start">啟動 AP</button>
                 `}
@@ -91,8 +91,8 @@ async function renderWifi() {
         container.querySelector('#hotspot-stop').onclick = stopHotspot;
     } else {
         const openCb = container.querySelector('#ap-open');
-        const passGroup = container.querySelector('#ap-pass-group');
-        openCb.onchange = () => { passGroup.style.display = openCb.checked ? 'none' : 'flex'; };
+        const passInput = container.querySelector('#ap-pass');
+        openCb.onchange = () => { passInput.disabled = openCb.checked; if (openCb.checked) passInput.value = ''; };
         container.querySelector('#hotspot-start').onclick = startHotspot;
     }
 }

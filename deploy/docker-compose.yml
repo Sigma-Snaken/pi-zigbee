@@ -11,10 +11,10 @@ services:
     image: koenkk/zigbee2mqtt
     ports:
       - "8080:8080"
+    privileged: true
     volumes:
       - ./zigbee2mqtt:/app/data
-    devices:
-      - /dev/zigbee:/dev/zigbee
+      - /dev:/dev
     environment:
       - TZ=Asia/Taipei
     depends_on:

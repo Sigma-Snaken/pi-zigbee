@@ -85,10 +85,22 @@ async def wifi_connect(ssid, password):
 
 
 async def hotspot_start(ssid, password):
-    cmd = ["nmcli", "dev", "wifi", "hotspot", "ifname", "wlan0", "ssid", ssid]
     if password:
-        cmd += ["password", password]
-    code, out = await run(cmd)
+        cmd = ["nmcli", "dev", "wifi", "hotspot", "ifname", "wlan0",
+               "ssid", ssid, "password", password]
+        code, out = await run(cmd)
+    else:
+        # nmcli hotspot always requires password; use connection add for open AP
+        await run(["nmcli", "connection", "delete", ssid])
+        code, out = await run([
+            "nmcli", "connection", "add", "type", "wifi", "ifname", "wlan0",
+            "con-name", ssid, "ssid", ssid,
+            "802-11-wireless.mode", "ap", "802-11-wireless.band", "bg",
+            "ipv4.method", "shared", "ipv6.method", "disabled",
+        ])
+        if code != 0:
+            return {"ok": False, "error": out}
+        code, out = await run(["nmcli", "connection", "up", ssid])
     if code != 0:
         return {"ok": False, "error": out}
     return {"ok": True, "message": f"AP started: {ssid}"}
