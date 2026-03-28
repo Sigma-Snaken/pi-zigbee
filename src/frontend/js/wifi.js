@@ -64,9 +64,7 @@ async function renderWifi() {
                     <div class="form-group form-inline">
                         <label>密碼</label>
                         <input id="ap-pass" value="" type="password" placeholder="至少 8 碼" disabled />
-                    </div>
-                    <div class="form-group form-inline">
-                        <label><input type="checkbox" id="ap-open" checked> 開放網路</label>
+                        <label style="white-space:nowrap"><input type="checkbox" id="ap-open" checked style="margin-right:4px;vertical-align:middle"> 開放</label>
                     </div>
                     <button class="btn btn-primary" id="hotspot-start">啟動 AP</button>
                 `}
