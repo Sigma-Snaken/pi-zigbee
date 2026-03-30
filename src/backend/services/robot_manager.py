@@ -94,8 +94,15 @@ class RobotService:
                 except Exception as e:
                     logger.warning(f"Streamer state change error: {e}")
 
-        # 3. Invalidate Tier 2 caches on reconnect
+        # 3. On reconnect: refresh serial + invalidate Tier 2 caches
         if state == ConnectionState.CONNECTED and self.conn:
+            try:
+                result = self.conn.ping()
+                if result.get("ok"):
+                    self.serial = result.get("serial") or self.serial
+                    logger.info(f"Robot {self.robot_id} serial: {self.serial}")
+            except Exception:
+                pass
             try:
                 self.conn.refresh_shortcuts()
                 self.conn.refresh_maps()
