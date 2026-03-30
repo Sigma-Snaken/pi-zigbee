@@ -88,6 +88,6 @@ initRobots();
 initButtons(ws);
 initBindings();
 initLogs(ws);
-initMonitor();
+initMonitor(ws);
 initWifi();
 // All init functions render skeletons synchronously then await data independently

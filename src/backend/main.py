@@ -22,6 +22,32 @@ logger = get_logger("main")
 _state: dict = {}
 
 
+async def _pose_broadcast_loop(robot_manager: RobotManager, ws_manager: WSManager):
+    """Push pose updates for all connected robots every 1s via WebSocket."""
+    while True:
+        try:
+            for robot_id in robot_manager.all_ids():
+                svc = robot_manager.get(robot_id)
+                if not svc or not svc.controller:
+                    continue
+                state = svc.controller.state
+                if state is None or getattr(state, 'pose_x', None) is None:
+                    continue
+                await ws_manager.broadcast("robot:pose", {
+                    "robot_id": robot_id,
+                    "x": state.pose_x,
+                    "y": state.pose_y,
+                    "theta": state.pose_theta,
+                    "battery": getattr(state, 'battery_pct', None),
+                    "is_command_running": getattr(state, 'is_command_running', False),
+                })
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+        await asyncio.sleep(1)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db_path = os.environ.get("DB_PATH", "data/app.db")
@@ -69,6 +95,9 @@ async def lifespan(app: FastAPI):
     rtt_logger = RTTLogger(db, robot_manager, interval=5.0)
     await rtt_logger.start()
 
+    # Start pose broadcast (push controller.state via WebSocket every 1s)
+    pose_task = asyncio.create_task(_pose_broadcast_loop(robot_manager, ws_manager))
+
     _state.update({
         "db": db,
         "ws_manager": ws_manager,
@@ -82,6 +111,11 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    pose_task.cancel()
+    try:
+        await pose_task
+    except asyncio.CancelledError:
+        pass
     await rtt_logger.stop()
     if mqtt_service:
         await mqtt_service.stop()
