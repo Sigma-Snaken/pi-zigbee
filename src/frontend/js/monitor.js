@@ -256,7 +256,7 @@ function redraw() {
         ctx.stroke();
 
         const arrowLen = 16;
-        const angle = -currentPose.theta;
+        const angle = currentPose.theta;
         const ax = px + Math.cos(angle) * arrowLen;
         const ay = py - Math.sin(angle) * arrowLen;
         ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(ax, ay);
