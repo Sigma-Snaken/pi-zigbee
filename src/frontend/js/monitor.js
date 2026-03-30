@@ -187,19 +187,8 @@ async function loadMap(robotId) {
 
         cachedMapImg = img;
         cachedMapMeta = data.map;
+        cachedMapParams = { ...data.map };
         currentPose = data.pose;
-
-        // Calculate scale
-        const section = document.getElementById('map-section');
-        const maxW = Math.min((section ? section.clientWidth - 4 : 500), 500);
-        const scale = Math.min(maxW / img.width, 400 / img.height, 1);
-        cachedMapParams = { ...data.map, scale };
-
-        const canvas = document.getElementById('map-canvas');
-        if (canvas) {
-            canvas.width = img.width * scale;
-            canvas.height = img.height * scale;
-        }
 
         redraw();
     } catch (e) {
@@ -220,8 +209,25 @@ function worldToPixel(wx, wy, map, scale) {
 function redraw() {
     const canvas = document.getElementById('map-canvas');
     if (!canvas || !cachedMapImg || !cachedMapParams) return;
+
+    // Calculate scale from current (visible) section width — not cached,
+    // because the tab may be hidden when loadMap runs at startup.
+    const section = document.getElementById('map-section');
+    const sectionW = section ? section.clientWidth - 4 : 500;
+    if (sectionW <= 0) return; // tab still hidden
+    const maxW = Math.min(sectionW, 500);
+    const scale = Math.min(maxW / cachedMapImg.width, 400 / cachedMapImg.height, 1);
+    cachedMapParams.scale = scale;
+
+    // Resize canvas if needed
+    const w = Math.round(cachedMapImg.width * scale);
+    const h = Math.round(cachedMapImg.height * scale);
+    if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+    }
+
     const ctx = canvas.getContext('2d');
-    const scale = cachedMapParams.scale;
 
     // 1. Draw cached map image
     ctx.drawImage(cachedMapImg, 0, 0, canvas.width, canvas.height);
