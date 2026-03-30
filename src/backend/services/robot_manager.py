@@ -27,7 +27,6 @@ class RobotService:
         self.commands: KachakaCommands | None = None
         self.queries: KachakaQueries | None = None
         self.controller: RobotController | None = None
-        self.serial: str | None = None
         self.front_streamer: CameraStreamer | None = None
         self.back_streamer: CameraStreamer | None = None
         self._ws_manager = ws_manager
@@ -41,8 +40,7 @@ class RobotService:
         self.commands = _cmds_cls(self.conn)
         self.queries = _queries_cls(self.conn)
         result = self.conn.ping()
-        self.serial = result.get('serial')
-        logger.info(f"Connected to robot {self.robot_id} at {self.ip}: {self.serial or 'unknown'}")
+        logger.info(f"Connected to robot {self.robot_id} at {self.ip}: {self.conn.serial or 'unknown'}")
 
         # Start connection monitoring BEFORE controller.start().
         # RobotController.start() also calls conn.start_monitoring() internally,
@@ -94,15 +92,8 @@ class RobotService:
                 except Exception as e:
                     logger.warning(f"Streamer state change error: {e}")
 
-        # 3. On reconnect: refresh serial + invalidate Tier 2 caches
+        # 3. Invalidate Tier 2 caches on reconnect
         if state == ConnectionState.CONNECTED and self.conn:
-            try:
-                result = self.conn.ping()
-                if result.get("ok"):
-                    self.serial = result.get("serial") or self.serial
-                    logger.info(f"Robot {self.robot_id} serial: {self.serial}")
-            except Exception:
-                pass
             try:
                 self.conn.refresh_shortcuts()
                 self.conn.refresh_maps()

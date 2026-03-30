@@ -79,7 +79,7 @@ class RTTLogger:
                 if x is None or y is None:
                     continue
 
-                serial = svc.serial or ""
+                serial = (svc.conn.serial if svc.conn else "") or ""
 
                 now = datetime.now(timezone.utc).isoformat()
                 for rtt_ms in new_rtts:

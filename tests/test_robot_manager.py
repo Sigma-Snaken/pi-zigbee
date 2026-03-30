@@ -12,6 +12,7 @@ from services.robot_manager import RobotService, RobotManager
 class FakeConnection:
     def __init__(self, ip):
         self.ip = ip
+        self.serial = "KCK-TEST"
 
     def ping(self):
         return {"ok": True, "serial": "KCK-TEST", "pose": {"x": 0, "y": 0, "theta": 0}}
@@ -25,6 +26,7 @@ class FakeConnectionWithMonitoring:
 
     def __init__(self, ip):
         self.ip = ip
+        self.serial = "KCK-MON"
         self.state = ConnectionState.DISCONNECTED
         self.client = type("FakeClient", (), {})()  # stub for sdk = conn.client
         self.monitoring_started = False

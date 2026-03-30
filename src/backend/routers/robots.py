@@ -41,7 +41,7 @@ async def list_robots():
             if svc and svc.conn:
                 from kachaka_core.connection import ConnectionState
                 online = svc.conn.state == ConnectionState.CONNECTED
-                serial = svc.serial
+                serial = svc.conn.serial or None
                 if svc.controller:
                     state = svc.controller.state
                     battery = getattr(state, 'battery_pct', None)
