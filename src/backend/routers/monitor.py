@@ -1,4 +1,5 @@
 import asyncio
+import base64
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -16,12 +17,18 @@ async def get_map(robot_id: str):
     if not rm:
         raise HTTPException(503, "Robot manager not available")
     svc = rm.get(robot_id)
-    if not svc or not svc.queries:
+    if not svc or not svc.conn:
         raise HTTPException(404, f"Robot '{robot_id}' not connected")
     try:
-        # Map is sync gRPC — run in thread to avoid blocking event loop
+        # Use Tier 2 cached map — only fetches via gRPC on first call
+        # (invalidated on reconnect via conn.refresh_maps())
         loop = asyncio.get_event_loop()
-        map_data = await loop.run_in_executor(None, svc.queries.get_map)
+        cached = await loop.run_in_executor(None, lambda: svc.conn.map_image)
+
+        if not cached:
+            raise HTTPException(503, "Map not available")
+
+        image_b64 = base64.b64encode(cached["png_bytes"]).decode()
 
         # Pose from controller.state (non-blocking, already polled in background)
         pose = None
@@ -37,16 +44,18 @@ async def get_map(robot_id: str):
         return {
             "ok": True,
             "map": {
-                "image_base64": map_data.get("image_base64"),
-                "format": map_data.get("format", "png"),
-                "resolution": map_data.get("resolution"),
-                "width": map_data.get("width"),
-                "height": map_data.get("height"),
-                "origin_x": map_data.get("origin_x"),
-                "origin_y": map_data.get("origin_y"),
+                "image_base64": image_b64,
+                "format": "png",
+                "resolution": cached.get("resolution"),
+                "width": cached.get("width"),
+                "height": cached.get("height"),
+                "origin_x": cached.get("origin_x"),
+                "origin_y": cached.get("origin_y"),
             },
             "pose": pose,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
