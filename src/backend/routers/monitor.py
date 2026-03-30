@@ -1,5 +1,4 @@
 import asyncio
-import base64
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -92,12 +91,11 @@ async def camera_stream(robot_id: str, camera: str):
         streamer = svc.front_streamer if camera == "front" else svc.back_streamer
 
     async def generate():
-        last_b64 = None
+        last_frame = None
         while streamer and streamer.is_running:
-            frame = streamer.latest_frame
-            if frame and frame.get("ok") and frame.get("image_base64") != last_b64:
-                last_b64 = frame["image_base64"]
-                jpeg = base64.b64decode(last_b64)
+            jpeg = streamer.latest_frame_bytes
+            if jpeg is not None and jpeg is not last_frame:
+                last_frame = jpeg
                 yield (
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n"
