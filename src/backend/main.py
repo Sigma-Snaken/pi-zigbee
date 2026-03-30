@@ -32,7 +32,8 @@ async def lifespan(app: FastAPI):
     logger.info("Database connected and migrated")
 
     ws_manager = WSManager()
-    robot_manager = RobotManager()
+    loop = asyncio.get_event_loop()
+    robot_manager = RobotManager(ws_manager=ws_manager, loop=loop)
     action_executor = ActionExecutor(robot_manager)
     notifier = TelegramNotifier()
     button_manager = ButtonManager(db, action_executor, ws_manager)
@@ -58,7 +59,6 @@ async def lifespan(app: FastAPI):
 
     async with db.execute("SELECT id, ip FROM robots WHERE enabled = 1") as cursor:
         rows = await cursor.fetchall()
-    loop = asyncio.get_event_loop()
     for robot_id, ip in rows:
         try:
             await loop.run_in_executor(None, robot_manager.add, robot_id, ip)
