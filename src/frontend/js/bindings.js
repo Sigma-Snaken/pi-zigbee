@@ -7,7 +7,7 @@ const TRIGGER_LABELS = {single:'單擊',double:'雙擊',long:'長按'};
 const ACTIONS = [
     {value:'move_to_location',label:'移動到位置'},{value:'return_home',label:'回充電座'},{value:'speak',label:'語音播報'},
     {value:'move_shelf',label:'搬運貨架'},{value:'return_shelf',label:'歸還貨架'},{value:'dock_shelf',label:'對接貨架'},
-    {value:'undock_shelf',label:'放下貨架'},{value:'start_shortcut',label:'執行捷徑'},
+    {value:'undock_shelf',label:'放下貨架'},{value:'start_shortcut',label:'執行捷徑'},{value:'cancel_command',label:'取消命令'},
 ];
 
 export async function initBindings() { await renderBindings(); }
