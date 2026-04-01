@@ -334,6 +334,12 @@ tr:hover td {
     51%, 100% { opacity: 0.3; }
 }
 
+@keyframes row-flash {
+    0% { background-color: rgba(0, 210, 180, 0.25); }
+    100% { background-color: transparent; }
+}
+tr.flash { animation: row-flash 0.8s ease-out; }
+
 /* ── Pairing Zone ── */
 .pair-zone {
     margin-top: 1rem;
