@@ -11,6 +11,7 @@ from database.migrations import run_migrations
 from services.ws_manager import WSManager
 from services.robot_manager import RobotManager
 from services.action_executor import ActionExecutor
+from services.command_queue import CommandQueue
 from services.button_manager import ButtonManager
 from services.mqtt_service import MQTTService
 from services.notifier import TelegramNotifier
@@ -61,8 +62,14 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_event_loop()
     robot_manager = RobotManager(ws_manager=ws_manager, loop=loop)
     action_executor = ActionExecutor(robot_manager)
+    command_queue = CommandQueue(
+        action_executor=action_executor,
+        robot_manager=robot_manager,
+        ws_manager=ws_manager,
+        db=db,
+    )
     notifier = TelegramNotifier()
-    button_manager = ButtonManager(db, action_executor, ws_manager)
+    button_manager = ButtonManager(db, command_queue, ws_manager)
 
     # Load telegram config from DB
     try:
@@ -72,6 +79,15 @@ async def lifespan(app: FastAPI):
         if row:
             cfg = _json.loads(row[0])
             notifier.configure(cfg.get("bot_token", ""), cfg.get("chat_id", ""))
+    except Exception:
+        pass
+
+    # Load queue_enabled from DB
+    try:
+        async with db.execute("SELECT value FROM settings WHERE key = 'queue_enabled'") as cursor:
+            row = await cursor.fetchone()
+        if row:
+            command_queue.set_enabled(row[0] == "true")
     except Exception:
         pass
 
@@ -103,6 +119,7 @@ async def lifespan(app: FastAPI):
         "ws_manager": ws_manager,
         "robot_manager": robot_manager,
         "action_executor": action_executor,
+        "command_queue": command_queue,
         "button_manager": button_manager,
         "mqtt_service": mqtt_service,
         "notifier": notifier,
@@ -127,13 +144,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-from routers import robots, buttons, bindings, logs, ws, monitor, settings, wifi  # noqa: E402
+from routers import robots, buttons, bindings, logs, ws, monitor, settings, wifi, queue  # noqa: E402
 app.include_router(robots.router, prefix="/api")
 app.include_router(buttons.router, prefix="/api")
 app.include_router(bindings.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
 app.include_router(monitor.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(queue.router, prefix="/api")
 app.include_router(wifi.router, prefix="/api")
 app.include_router(ws.router)
 

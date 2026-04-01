@@ -11,13 +11,18 @@ from database.migrations import run_migrations
 from services.button_manager import ButtonManager
 
 
-class FakeActionExecutor:
+class FakeCommandQueue:
     def __init__(self):
-        self.calls = []
+        self.enqueue_calls = []
+        self.cancel_calls = []
 
-    def execute(self, robot_id, action, params):
-        self.calls.append((robot_id, action, params))
-        return {"ok": True, "action": action}
+    async def enqueue(self, robot_id, action, params, button_id=None, trigger=None):
+        self.enqueue_calls.append((robot_id, action, params))
+        return {"ok": True, "queue_id": "fake-id", "position": 1}
+
+    async def cancel_current(self, robot_id):
+        self.cancel_calls.append(robot_id)
+        return {"ok": True}
 
 
 class FakeWSManager:
@@ -34,10 +39,10 @@ async def setup(tmp_path):
     await connect(db_path)
     db = get_db()
     await run_migrations(db)
-    executor = FakeActionExecutor()
+    queue = FakeCommandQueue()
     ws = FakeWSManager()
-    mgr = ButtonManager(db, executor, ws)
-    yield mgr, db, executor, ws
+    mgr = ButtonManager(db, queue, ws)
+    yield mgr, db, queue, ws
     await disconnect()
 
 
@@ -69,7 +74,7 @@ async def test_handle_device_joined_duplicate(setup):
 
 @pytest.mark.asyncio
 async def test_handle_button_action_with_binding(setup):
-    mgr, db, executor, ws = setup
+    mgr, db, queue, ws = setup
     # Setup: robot + button + binding
     await db.execute(
         "INSERT INTO robots (id, name, ip, enabled, created_at) VALUES (?, ?, ?, 1, datetime('now'))",
@@ -90,18 +95,13 @@ async def test_handle_button_action_with_binding(setup):
         "ieee_addr": "0x00124b00cccccc",
         "action": "single",
     })
-    assert len(executor.calls) == 1
-    assert executor.calls[0] == ("r1", "return_home", {})
-    # Check action_logs
-    async with db.execute("SELECT action, result_ok FROM action_logs") as cursor:
-        row = await cursor.fetchone()
-    assert row[0] == "return_home"
-    assert row[1] == 1
+    assert len(queue.enqueue_calls) == 1
+    assert queue.enqueue_calls[0] == ("r1", "return_home", {})
 
 
 @pytest.mark.asyncio
 async def test_handle_button_action_no_binding(setup):
-    mgr, db, executor, _ = setup
+    mgr, db, queue, _ = setup
     await db.execute(
         "INSERT INTO buttons (ieee_addr, name, paired_at) VALUES (?, ?, datetime('now'))",
         ("0x00124b00dddddd", "Unbound"),
@@ -112,15 +112,15 @@ async def test_handle_button_action_no_binding(setup):
         "ieee_addr": "0x00124b00dddddd",
         "action": "single",
     })
-    assert len(executor.calls) == 0
+    assert len(queue.enqueue_calls) == 0
 
 
 @pytest.mark.asyncio
 async def test_handle_button_action_unknown_button(setup):
-    mgr, _, executor, _ = setup
+    mgr, _, queue, _ = setup
     await mgr.handle_message({
         "type": "button_action",
         "ieee_addr": "0x00124b00unknown",
         "action": "single",
     })
-    assert len(executor.calls) == 0
+    assert len(queue.enqueue_calls) == 0

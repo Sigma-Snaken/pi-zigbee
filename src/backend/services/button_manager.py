@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import json
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import aiosqlite
 
-from services.action_executor import ActionExecutor
 from services.ws_manager import WSManager
 from utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from services.command_queue import CommandQueue
 
 logger = get_logger("button_manager")
 
@@ -14,11 +19,11 @@ class ButtonManager:
     def __init__(
         self,
         db: aiosqlite.Connection,
-        action_executor: ActionExecutor,
+        command_queue: CommandQueue,
         ws_manager: WSManager,
     ):
         self._db = db
-        self._executor = action_executor
+        self._queue = command_queue
         self._ws = ws_manager
 
     async def handle_message(self, msg: dict) -> None:
@@ -73,7 +78,7 @@ class ButtonManager:
         trigger = msg["action"]
         now = datetime.now(timezone.utc).isoformat()
 
-        # Update battery + last_seen in one query, and fetch button_id
+        # Update battery + last_seen
         if msg.get("battery") is not None:
             await self._db.execute(
                 "UPDATE buttons SET battery = ?, last_seen = ? WHERE ieee_addr = ?",
@@ -110,20 +115,27 @@ class ButtonManager:
         params = json.loads(params_json) if params_json else {}
 
         logger.info(f"Button {ieee} trigger={trigger} -> {action} on {robot_id}")
-        result = await self._executor.execute(robot_id, action, params)
 
-        now = datetime.now(timezone.utc).isoformat()
-        await self._db.execute(
-            "INSERT INTO action_logs (button_id, trigger, robot_id, action, params, result_ok, result_detail, executed_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (button_id, trigger, robot_id, action, params_json, 1 if result.get("ok") else 0, json.dumps(result), now),
-        )
-        await self._db.commit()
-
-        await self._ws.broadcast("action_executed", {
-            "button_id": button_id,
-            "trigger": trigger,
-            "robot_id": robot_id,
-            "action": action,
-            "result": result,
-        })
+        if action == "cancel_command":
+            result = await self._queue.cancel_current(robot_id)
+            # Log cancel action directly
+            now = datetime.now(timezone.utc).isoformat()
+            await self._db.execute(
+                "INSERT INTO action_logs (button_id, trigger, robot_id, action, params, "
+                "result_ok, result_detail, executed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (button_id, trigger, robot_id, action, params_json,
+                 1 if result.get("ok") else 0, json.dumps(result), now),
+            )
+            await self._db.commit()
+            await self._ws.broadcast("action_executed", {
+                "button_id": button_id,
+                "trigger": trigger,
+                "robot_id": robot_id,
+                "action": action,
+                "result": result,
+            })
+        else:
+            await self._queue.enqueue(
+                robot_id, action, params,
+                button_id=button_id, trigger=trigger,
+            )
