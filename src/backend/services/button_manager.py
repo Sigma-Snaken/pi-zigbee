@@ -90,6 +90,14 @@ class ButtonManager:
             )
         await self._db.commit()
 
+        # Broadcast button activity so frontend refreshes last_seen
+        await self._ws.broadcast("button:activity", {
+            "ieee_addr": ieee,
+            "trigger": trigger,
+            "battery": msg.get("battery"),
+            "last_seen": now,
+        })
+
         async with self._db.execute(
             "SELECT id FROM buttons WHERE ieee_addr = ?", (ieee,)
         ) as cursor:
