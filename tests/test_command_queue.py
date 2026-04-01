@@ -98,6 +98,18 @@ async def test_enqueue_debounce_consecutive(setup):
 
 
 @pytest.mark.asyncio
+async def test_enqueue_debounce_against_executing(setup):
+    queue, executor, ws, _, _ = setup
+    executor.delay = 1.0
+    await queue.enqueue("r1", "return_home", {})
+    await asyncio.sleep(0.05)  # let worker start executing
+    # Queue is empty, but return_home is executing — should debounce
+    r = await queue.enqueue("r1", "return_home", {})
+    assert r["ok"] is False
+    assert "debounce" in r["error"].lower()
+
+
+@pytest.mark.asyncio
 async def test_enqueue_allows_non_consecutive_duplicates(setup):
     queue, executor, ws, _, _ = setup
     executor.delay = 0.5

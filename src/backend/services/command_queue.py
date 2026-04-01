@@ -79,12 +79,12 @@ class CommandQueue:
         if not self._enabled:
             return await self._execute_direct(robot_id, action, params, button_id, trigger)
 
+        # Debounce: compare with last queued item, or currently executing if queue is empty
         robot_queue = self._queues.get(robot_id, [])
-        if robot_queue:
-            last = robot_queue[-1]
-            if last.action == action and last.params == params:
-                logger.info(f"Debounced {action} on {robot_id}")
-                return {"ok": False, "error": "Debounced: duplicate of last queued command"}
+        last = robot_queue[-1] if robot_queue else self._executing.get(robot_id)
+        if last and last.action == action and last.params == params:
+            logger.info(f"Debounced {action} on {robot_id}")
+            return {"ok": False, "error": "Debounced: duplicate of last queued command"}
 
         item = QueueItem(
             id=str(uuid.uuid4()),
