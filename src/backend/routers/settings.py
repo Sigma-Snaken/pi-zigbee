@@ -84,3 +84,37 @@ async def test_notify(request: Request):
     return {"ok": success}
 
 
+class QueueConfig(BaseModel):
+    enabled: bool
+
+
+@router.get("/settings/queue")
+async def get_queue_settings():
+    db = _state["db"]
+    enabled = True  # default
+    async with db.execute(
+        "SELECT value FROM settings WHERE key = 'queue_enabled'"
+    ) as cursor:
+        row = await cursor.fetchone()
+    if row:
+        enabled = row[0] == "true"
+    return {"enabled": enabled}
+
+
+@router.put("/settings/queue")
+async def update_queue_settings(body: QueueConfig):
+    db = _state["db"]
+    enabled = body.enabled
+    value = "true" if enabled else "false"
+    await db.execute(
+        "INSERT INTO settings (key, value) VALUES ('queue_enabled', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (value,),
+    )
+    await db.commit()
+    queue = _state.get("command_queue")
+    if queue:
+        queue.set_enabled(enabled)
+    return {"ok": True, "enabled": enabled}
+
+
