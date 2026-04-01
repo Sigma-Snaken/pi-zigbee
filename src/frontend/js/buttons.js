@@ -6,6 +6,8 @@ let pairTimer = null;
 
 export async function initButtons(ws) {
     ws.on('device_paired', async () => { showToast('新設備已配對!'); await renderButtons(); });
+    ws.on('action_executed', () => renderButtons());
+    ws.on('queue:completed', () => renderButtons());
     await renderButtons();
 }
 
