@@ -109,6 +109,13 @@ async def lifespan(app: FastAPI):
 
     # Start RTT logger
     rtt_logger = RTTLogger(db, robot_manager, interval=5.0)
+    try:
+        async with db.execute("SELECT value FROM settings WHERE key = 'rtt_logger_enabled'") as cursor:
+            row = await cursor.fetchone()
+        if row:
+            rtt_logger.set_enabled(row[0] == "true")
+    except Exception:
+        pass
     await rtt_logger.start()
 
     # Start pose broadcast (push controller.state via WebSocket every 1s)

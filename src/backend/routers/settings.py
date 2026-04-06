@@ -84,8 +84,37 @@ async def test_notify(request: Request):
     return {"ok": success}
 
 
-class QueueConfig(BaseModel):
+class ToggleConfig(BaseModel):
     enabled: bool
+
+
+@router.get("/settings/rtt-logger")
+async def get_rtt_logger_settings():
+    db = _state["db"]
+    enabled = True  # default
+    async with db.execute(
+        "SELECT value FROM settings WHERE key = 'rtt_logger_enabled'"
+    ) as cursor:
+        row = await cursor.fetchone()
+    if row:
+        enabled = row[0] == "true"
+    return {"enabled": enabled}
+
+
+@router.put("/settings/rtt-logger")
+async def update_rtt_logger_settings(body: ToggleConfig):
+    db = _state["db"]
+    value = "true" if body.enabled else "false"
+    await db.execute(
+        "INSERT INTO settings (key, value) VALUES ('rtt_logger_enabled', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (value,),
+    )
+    await db.commit()
+    rtt_logger = _state.get("rtt_logger")
+    if rtt_logger:
+        rtt_logger.set_enabled(body.enabled)
+    return {"ok": True, "enabled": body.enabled}
 
 
 @router.get("/settings/queue")
@@ -102,7 +131,7 @@ async def get_queue_settings():
 
 
 @router.put("/settings/queue")
-async def update_queue_settings(body: QueueConfig):
+async def update_queue_settings(body: ToggleConfig):
     db = _state["db"]
     enabled = body.enabled
     value = "true" if enabled else "false"

@@ -49,6 +49,10 @@ export const api = {
     updateNotifySettings: (data) => request('PUT', '/settings/notify', data),
     testNotify: () => request('POST', '/settings/notify/test'),
 
+    // RTT Logger
+    getRttLoggerSettings: () => request('GET', '/settings/rtt-logger'),
+    updateRttLoggerSettings: (data) => request('PUT', '/settings/rtt-logger', data),
+
     // Queue
     getQueue: () => request('GET', '/queue'),
     removeFromQueue: (id) => request('DELETE', `/queue/${id}`),

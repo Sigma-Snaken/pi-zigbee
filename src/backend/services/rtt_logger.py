@@ -18,6 +18,15 @@ class RTTLogger:
         self._interval = interval
         self._task: asyncio.Task | None = None
         self._last_poll_count: dict[str, int] = {}  # robot_id -> last seen poll_count
+        self._enabled: bool = True
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
+    def set_enabled(self, enabled: bool) -> None:
+        self._enabled = enabled
+        logger.info(f"RTT logger {'enabled' if enabled else 'disabled'}")
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._loop())
@@ -44,6 +53,8 @@ class RTTLogger:
                 await asyncio.sleep(self._interval)
 
     async def _record_all(self) -> None:
+        if not self._enabled:
+            return
         for robot_id in self._rm.all_ids():
             svc = self._rm.get(robot_id)
             if not svc or not svc.controller:

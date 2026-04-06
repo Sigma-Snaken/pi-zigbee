@@ -1,5 +1,6 @@
 data/
 .superpowers/
+.sigma/
 docs/plans/
 docs/superpowers/
 __pycache__/

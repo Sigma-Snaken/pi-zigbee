@@ -62,6 +62,10 @@ async function renderMonitor() {
                         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem">
                             <div style="display:flex;align-items:center;gap:0.5rem">
                                 <label style="display:flex;align-items:center;gap:0.25rem;cursor:pointer;font-weight:500;color:var(--text-primary)">
+                                    <input type="checkbox" id="rtt-logger-toggle"> RTT \u8a18\u9304
+                                </label>
+                                <span style="color:var(--border-medium)">|</span>
+                                <label style="display:flex;align-items:center;gap:0.25rem;cursor:pointer;font-weight:500;color:var(--text-primary)">
                                     <input type="checkbox" id="heatmap-toggle"> \u7db2\u8def\u6548\u80fd\u5716
                                 </label>
                                 <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></span>&lt;50ms
@@ -112,8 +116,21 @@ async function renderMonitor() {
     container.querySelector('#toggle-front-cam').addEventListener('click', (e) => toggleCamera(sel.value, 'front', e.target));
     container.querySelector('#toggle-back-cam').addEventListener('click', (e) => toggleCamera(sel.value, 'back', e.target));
 
+    const rttLoggerToggle = container.querySelector('#rtt-logger-toggle');
     const heatmapToggle = container.querySelector('#heatmap-toggle');
     const clearBtn = container.querySelector('#clear-heatmap');
+
+    // Load RTT logger state
+    api.getRttLoggerSettings().then(data => {
+        rttLoggerToggle.checked = data.enabled;
+    }).catch(() => {});
+
+    rttLoggerToggle.addEventListener('change', async () => {
+        try {
+            await api.updateRttLoggerSettings({ enabled: rttLoggerToggle.checked });
+            showToast(rttLoggerToggle.checked ? 'RTT 記錄已啟用' : 'RTT 記錄已停用');
+        } catch (err) { showToast(err.message, 'error'); }
+    });
 
     // Load stats on init
     api.getRttHeatmap(sel.value).then(data => {
